@@ -7,6 +7,7 @@ from pathlib import Path
 from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
 from ui.ImageViewer import ImageViewer
 from ui.TextEditor import TextEditor
+from ui.PDFViewer import PDFViewer
 
 def cmd_gui(args: argparse.Namespace) -> None:
     try:
@@ -166,6 +167,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     # Open image viewer
                     viewer = ImageViewer(temp_path, self)
                     viewer.exec()
+                elif mime_type == 'application/pdf':
+                    # Open PDF viewer
+                    viewer = PDFViewer(temp_path, self)
+                    viewer.exec()
                 else:
                     # Open text editor for text files and unknown types
                     editor = TextEditor(temp_path, self)
@@ -203,7 +208,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Error", str(e))
 
-    app = QtWidgets.QApplication([])
+    # Initialize QApplication with command line arguments for WebEngine compatibility
+    app = QtWidgets.QApplication(sys.argv)
     v = VaultApp(Path(args.repo))
     v.show()
     app.exec()
