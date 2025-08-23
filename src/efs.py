@@ -38,13 +38,11 @@ Commands:
 Security choices:
   - AEAD: AES-256-GCM via cryptography.hazmat
   - Argon2id via argon2-cffi low-level API
-  - Kmaster = Argon2id(SHA3-512(passphrase)) -> 32 bytes
+  - Kmaster = Argon2id(SHA3-512(passphrase)) -> 32 bytes or 256 bits
 
 Note: This is a reference implementation for clarity, not a final audited product.
 """
 from __future__ import annotations
-
-# ----------------------------- CLI -------------------------------
 from ui.cli import build_parser
 
 def main():
