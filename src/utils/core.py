@@ -46,6 +46,43 @@ def unlock(repo: Path, passphrase: str) -> tuple[InnerMetadata, bytes, Dict[str,
     return inner, kmaster, {"t": t, "m": m, "p": paral, "salt": salt}
 
 
+def update_file_in_vault(repo: Path, fid: str, new_content: bytes, passphrase: str) -> None:
+    """Update an existing file in the vault with new content."""
+    inner, kmaster, kdf = unlock(repo, passphrase)
+    p = repo_paths(repo)
+
+    # Find the file entry
+    match = next((f for f in inner.files if f["id"] == fid), None)
+    if not match:
+        raise ValueError(f"No such id: {fid}")
+
+    # Generate new per-file key
+    file_key = os.urandom(32)  # AES-256
+
+    # Encrypt new content with new file_key
+    file_nonce = os.urandom(12)
+    file_ct = AESGCM(file_key).encrypt(file_nonce, new_content, None)
+
+    # Write new blob: nonce||ct
+    blob_path = p["blobs"] / f"{fid}.bin"
+    with blob_path.open("wb") as f:
+        f.write(file_nonce + file_ct)
+
+    # Wrap new file_key with Kmaster
+    wrap_nonce, wrap_ct = aead_encrypt(kmaster, file_key)
+    import base64
+    keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
+
+    # Update the file entry
+    match["size"] = len(new_content)
+    match["file_key_wrap"] = keywrap.to_dict()
+
+    # Re-encrypt inner and save vault
+    inner_bytes = inner.to_bytes()
+    new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
+    save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+
+
 def cmd_add(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
     src = Path(args.path)

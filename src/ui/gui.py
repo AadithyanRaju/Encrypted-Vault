@@ -4,7 +4,7 @@ import mimetypes
 
 from pathlib import Path
 
-from utils.core import unlock, cmd_extract, cmd_add
+from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
 from ui.ImageViewer import ImageViewer
 from ui.TextEditor import TextEditor
 
@@ -64,6 +64,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
             self.inner = None
             self.kmaster = None
+            self.current_editor = None
+            self.current_file_id = None
 
         def unlock(self):
             pw = self.pass_edit.text()
@@ -108,6 +110,25 @@ def cmd_gui(args: argparse.Namespace) -> None:
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add file: {str(e)}")
 
+        def on_text_file_saved(self, file_path: str, content: str):
+            """Handle when a text file is saved in the editor."""
+            try:
+                # Update the file in the vault
+                update_file_in_vault(
+                    self.repo, 
+                    self.current_file_id, 
+                    content.encode('utf-8'), 
+                    self.pass_edit.text()
+                )
+                
+                # Refresh the table to show updated file size
+                self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
+                self.populate()
+                
+                QtWidgets.QMessageBox.information(self, "Success", "File updated in vault successfully!")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update file in vault: {str(e)}")
+
         def open_file(self):
             rows = sorted({ix.row() for ix in self.table.selectedIndexes()})
             if not rows:
@@ -117,6 +138,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
             r = rows[0]
             fid = self.table.item(r, 0).text()
             name = self.table.item(r, 1).text()
+            
+            # Store current file ID for saving
+            self.current_file_id = fid
             
             # Create temporary file for viewing
             import tempfile
@@ -145,6 +169,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 else:
                     # Open text editor for text files and unknown types
                     editor = TextEditor(temp_path, self)
+                    # Connect the save signal
+                    editor.file_saved.connect(self.on_text_file_saved)
+                    self.current_editor = editor
                     editor.exec()
                     
             except Exception as e:

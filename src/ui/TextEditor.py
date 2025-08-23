@@ -8,6 +8,9 @@ except Exception as e:
     sys.exit(1)
 
 class TextEditor(QtWidgets.QDialog):
+    # Signal to notify when file is saved
+    file_saved = QtCore.pyqtSignal(str, str)  # file_path, content
+    
     def __init__(self, file_path: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Text Editor - {Path(file_path).name}")
@@ -50,12 +53,40 @@ class TextEditor(QtWidgets.QDialog):
         layout.addLayout(btn_layout)
         
         self.file_path = file_path
+        self.original_content = self.text_edit.toPlainText()
     
     def save_file(self):
         try:
             content = self.text_edit.toPlainText()
             with open(self.file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
+            
+            # Emit signal to notify parent about the save
+            self.file_saved.emit(self.file_path, content)
+            
             QtWidgets.QMessageBox.information(self, "Success", "File saved successfully!")
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+    
+    def closeEvent(self, event):
+        # Check if content has changed
+        current_content = self.text_edit.toPlainText()
+        if current_content != self.original_content:
+            reply = QtWidgets.QMessageBox.question(
+                self, 
+                "Save Changes?", 
+                "The file has been modified. Do you want to save the changes?",
+                QtWidgets.QMessageBox.StandardButton.Save | 
+                QtWidgets.QMessageBox.StandardButton.Discard | 
+                QtWidgets.QMessageBox.StandardButton.Cancel
+            )
+            
+            if reply == QtWidgets.QMessageBox.StandardButton.Save:
+                self.save_file()
+                event.accept()
+            elif reply == QtWidgets.QMessageBox.StandardButton.Discard:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
