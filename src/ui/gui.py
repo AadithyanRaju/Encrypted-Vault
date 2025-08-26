@@ -1,6 +1,7 @@
 import argparse
 import sys
 import mimetypes
+import os
 
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             layout.addLayout(select_layout)
 
             # Table
-            self.table = QtWidgets.QTableWidget(0, 5)  # Added checkbox column
+            self.table = QtWidgets.QTableWidget(0, 5) 
             self.table.setHorizontalHeaderLabels(["Select", "ID", "Name", "Size", "Blob Path"])
             self.table.horizontalHeader().setStretchLastSection(True)
             layout.addWidget(self.table)
@@ -67,6 +68,11 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.add_btn.clicked.connect(self.add_file)
             self.add_btn.setEnabled(False)
             btn_row.addWidget(self.add_btn)
+            
+            self.add_folder_btn = QtWidgets.QPushButton("Add Folder…")
+            self.add_folder_btn.clicked.connect(self.add_folder)
+            self.add_folder_btn.setEnabled(False)
+            btn_row.addWidget(self.add_folder_btn)
             
             self.open_btn = QtWidgets.QPushButton("Open File")
             self.open_btn.clicked.connect(self.open_file)
@@ -100,6 +106,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.populate()
             self.save_btn.setEnabled(True)
             self.add_btn.setEnabled(True)
+            self.add_folder_btn.setEnabled(True)
             self.open_btn.setEnabled(True)
             self.remove_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
@@ -167,6 +174,116 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.information(self, "Success", f"Added {Path(file_path).name} to vault")
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add file: {str(e)}")
+
+        def add_folder(self):
+            dlg = QtWidgets.QFileDialog(self)
+            folder_path = dlg.getExistingDirectory(self, "Select folder to add to vault")
+            if not folder_path:
+                return
+            
+            folder_path = Path(folder_path)
+            if not folder_path.is_dir():
+                QtWidgets.QMessageBox.warning(self, "Invalid Selection", "Please select a valid folder")
+                return
+            
+            # Get all files in the folder recursively
+            files_to_add = []
+            for file_path in folder_path.rglob('*'):
+                if file_path.is_file():
+                    # Calculate relative path from the selected folder
+                    rel_path = file_path.relative_to(folder_path)
+                    files_to_add.append((file_path, rel_path))
+            
+            if not files_to_add:
+                QtWidgets.QMessageBox.information(self, "Empty Folder", "The selected folder contains no files")
+                return
+            
+            # Confirm with user
+            file_list = "\n".join([f"• {rel_path}" for file_path, rel_path in files_to_add[:10]])  # Show first 10
+            if len(files_to_add) > 10:
+                file_list += f"\n... and {len(files_to_add) - 10} more files"
+            
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Confirm Folder Addition",
+                f"Add {len(files_to_add)} files from '{folder_path.name}' to vault?\n\n{file_list}",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No
+            )
+            
+            if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+                try:
+                    success_count = 0
+                    failed_files = []
+                    
+                    # Show progress dialog
+                    progress = QtWidgets.QProgressDialog("Adding files to vault...", "Cancel", 0, len(files_to_add), self)
+                    progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+                    progress.setAutoClose(False)
+                    
+                    for i, (file_path, rel_path) in enumerate(files_to_add):
+                        progress.setValue(i)
+                        progress.setLabelText(f"Adding: {rel_path}")
+                        
+                        if progress.wasCanceled():
+                            break
+                        
+                        try:
+                            # Create a temporary file with the relative path as name to preserve structure
+                            import tempfile
+                            import shutil
+                            
+                            # Create a temporary directory structure
+                            temp_dir = tempfile.mkdtemp()
+                            temp_file_path = Path(temp_dir) / rel_path
+                            
+                            # Create parent directories if they don't exist
+                            temp_file_path.parent.mkdir(parents=True, exist_ok=True)
+                            
+                            # Copy the file to the temporary location with relative path
+                            shutil.copy2(file_path, temp_file_path)
+                            
+                            add_args = argparse.Namespace(
+                                repo=str(self.repo),
+                                path=str(temp_file_path),
+                                passphrase=self.pass_edit.text()
+                            )
+                            cmd_add(add_args)
+                            success_count += 1
+                            
+                            # Clean up temporary file
+                            temp_file_path.unlink()
+                            if temp_file_path.parent.exists() and not any(temp_file_path.parent.iterdir()):
+                                temp_file_path.parent.rmdir()
+                            
+                        except Exception as e:
+                            failed_files.append((str(rel_path), str(e)))
+                        finally:
+                            # Clean up temporary directory
+                            try:
+                                if Path(temp_dir).exists():
+                                    shutil.rmtree(temp_dir)
+                            except:
+                                pass
+                    
+                    progress.setValue(len(files_to_add))
+                    
+                    # Refresh the table
+                    self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
+                    self.populate()
+                    
+                    # Show results
+                    if failed_files:
+                        error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
+                        error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
+                        if len(failed_files) > 5:
+                            error_msg += f"\n... and {len(failed_files) - 5} more failures"
+                        QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
+                    else:
+                        QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
+                        
+                except Exception as e:
+                    QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 
         def remove_files(self):
             selected_files = self.get_selected_files()
