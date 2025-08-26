@@ -27,6 +27,7 @@ class KeyWrap:
 class FileEntry:
     id: str
     name: str
+    relpath: str | None
     blob: str
     size: int
     created_at: str

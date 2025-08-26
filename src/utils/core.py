@@ -114,9 +114,16 @@ def cmd_add(args: argparse.Namespace) -> None:
     import base64
     keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
 
+    # Optional relative path metadata to preserve folder structure
+    relpath_value = getattr(args, "relpath", None)
+    if relpath_value:
+        # normalize separators to POSIX-style for portability
+        relpath_value = str(Path(relpath_value).as_posix())
+
     entry = FileEntry(
         id=fid,
         name=src.name,
+        relpath=relpath_value,
         blob=f"blobs/{fid}.bin",
         size=len(plaintext),
         created_at=rel_time_iso(os.path.getctime(src)),

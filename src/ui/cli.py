@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_add = sub.add_parser("add", help="Add a file (encrypt)")
     p_add.add_argument("repo", help="Path to repo directory")
     p_add.add_argument("path", help="Plaintext file to add")
+    p_add.add_argument("--relpath", help="Relative path to preserve folder structure", required=False)
     p_add.add_argument("--passphrase", required=True)
     p_add.set_defaults(func=cmd_add)
 

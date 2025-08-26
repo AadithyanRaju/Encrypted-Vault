@@ -56,11 +56,12 @@ def cmd_gui(args: argparse.Namespace) -> None:
             select_layout.addStretch()
             layout.addLayout(select_layout)
 
-            # Table
-            self.table = QtWidgets.QTableWidget(0, 5) 
-            self.table.setHorizontalHeaderLabels(["Select", "ID", "Name", "Size", "Blob Path"])
-            self.table.horizontalHeader().setStretchLastSection(True)
-            layout.addWidget(self.table)
+            # Tree for folders/files
+            self.tree = QtWidgets.QTreeWidget()
+            self.tree.setColumnCount(5)
+            self.tree.setHeaderLabels(["Select", "ID", "Name", "Size", "Relpath"])
+            self.tree.header().setStretchLastSection(True)
+            layout.addWidget(self.tree)
 
             # Actions
             btn_row = QtWidgets.QHBoxLayout()
@@ -113,45 +114,63 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.deselect_all_btn.setEnabled(True)
 
         def populate(self):
-            self.table.setRowCount(0)
+            self.tree.clear()
+            # Build folder structure from relpaths
+            folders = {}
             for f in self.inner.files:
-                r = self.table.rowCount()
-                self.table.insertRow(r)
-                
-                # Checkbox for selection
+                relpath = f.get("relpath") or f.get("name", "")
+                parts = Path(relpath).parts
+                parent = self.tree.invisibleRootItem()
+                current_path = []
+                # Create/find folder nodes
+                for part in parts[:-1]:
+                    current_path.append(part)
+                    key = "/".join(current_path)
+                    if key not in folders:
+                        item = QtWidgets.QTreeWidgetItem(["", "", part, "", "/".join(current_path)])
+                        item.setFirstColumnSpanned(False)
+                        folders[key] = item
+                        parent.addChild(item)
+                    parent = folders[key]
+                # Add file leaf
+                leaf = QtWidgets.QTreeWidgetItem(["", f.get("id", ""), f.get("name", ""), str(f.get("size", 0)), relpath])
+                parent.addChild(leaf)
+                # Add a checkbox widget on column 0
                 checkbox = QtWidgets.QCheckBox()
                 checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
-                self.table.setCellWidget(r, 0, checkbox)
-                
-                # File data
-                self.table.setItem(r, 1, QtWidgets.QTableWidgetItem(f.get("id", "")))
-                self.table.setItem(r, 2, QtWidgets.QTableWidgetItem(f.get("name", "")))
-                self.table.setItem(r, 3, QtWidgets.QTableWidgetItem(str(f.get("size", 0))))
-                self.table.setItem(r, 4, QtWidgets.QTableWidgetItem(f.get("blob", "")))
+                self.tree.setItemWidget(leaf, 0, checkbox)
 
         def select_all(self):
             """Select all files in the table."""
-            for row in range(self.table.rowCount()):
-                checkbox = self.table.cellWidget(row, 0)
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                checkbox = self.tree.itemWidget(item, 0)
                 if checkbox:
                     checkbox.setChecked(True)
+                it += 1
 
         def deselect_all(self):
             """Deselect all files in the table."""
-            for row in range(self.table.rowCount()):
-                checkbox = self.table.cellWidget(row, 0)
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                checkbox = self.tree.itemWidget(item, 0)
                 if checkbox:
                     checkbox.setChecked(False)
+                it += 1
 
         def get_selected_files(self):
             """Get list of selected file IDs and names."""
             selected = []
-            for row in range(self.table.rowCount()):
-                checkbox = self.table.cellWidget(row, 0)
-                if checkbox and checkbox.isChecked():
-                    fid = self.table.item(row, 1).text()
-                    name = self.table.item(row, 2).text()
-                    selected.append((fid, name))
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                checkbox = self.tree.itemWidget(item, 0)
+                # only leaves have IDs
+                if checkbox and checkbox.isChecked() and item.text(1):
+                    selected.append((item.text(1), item.text(2), item.text(4)))
+                it += 1
             return selected
 
         def add_file(self):
@@ -243,28 +262,23 @@ def cmd_gui(args: argparse.Namespace) -> None:
                             # Copy the file to the temporary location with relative path
                             shutil.copy2(file_path, temp_file_path)
                             
+                            # Prefix relpath with selected folder name to keep top-level folder
+                            prefixed_rel = Path(folder_path.name) / rel_path
                             add_args = argparse.Namespace(
                                 repo=str(self.repo),
-                                path=str(temp_file_path),
+                                path=str(file_path),
+                                relpath=str(prefixed_rel),
                                 passphrase=self.pass_edit.text()
                             )
                             cmd_add(add_args)
                             success_count += 1
                             
-                            # Clean up temporary file
-                            temp_file_path.unlink()
-                            if temp_file_path.parent.exists() and not any(temp_file_path.parent.iterdir()):
-                                temp_file_path.parent.rmdir()
+                            # No temp cleanup needed now
                             
                         except Exception as e:
                             failed_files.append((str(rel_path), str(e)))
                         finally:
-                            # Clean up temporary directory
-                            try:
-                                if Path(temp_dir).exists():
-                                    shutil.rmtree(temp_dir)
-                            except:
-                                pass
+                            pass
                     
                     progress.setValue(len(files_to_add))
                     
@@ -292,7 +306,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 return
             
             # Confirm deletion
-            file_list = "\n".join([f"• {name}" for fid, name in selected_files])
+            file_list = "\n".join([f"• {name}" for fid, name, _ in selected_files])
             reply = QtWidgets.QMessageBox.question(
                 self,
                 "Confirm Deletion",
@@ -304,7 +318,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                 try:
                     # Remove each selected file
-                    for fid, name in selected_files:
+                    for fid, name, _ in selected_files:
                         rm_args = argparse.Namespace(
                             repo=str(self.repo),
                             id=fid,
@@ -349,7 +363,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.warning(self, "Multiple Selection", "Please select only one file to open")
                 return
             
-            fid, name = selected_files[0]
+            fid, name, relpath = selected_files[0]
             
             # Store current file ID for saving
             self.current_file_id = fid
@@ -408,7 +422,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             
             if len(selected_files) == 1:
                 # Single file - use save dialog
-                fid, name = selected_files[0]
+                fid, name, relpath = selected_files[0]
                 dlg = QtWidgets.QFileDialog(self)
                 out, _ = dlg.getSaveFileName(self, "Save decrypted file", name)
                 if not out:
@@ -429,8 +443,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 
                 try:
                     success_count = 0
-                    for fid, name in selected_files:
-                        out_path = Path(out_dir) / name
+                    for fid, name, relpath in selected_files:
+                        # Recreate folder structure when extracting many
+                        out_path = Path(out_dir) / (relpath or name)
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
                         args = argparse.Namespace(repo=str(self.repo), id=fid, out=str(out_path), passphrase=self.pass_edit.text())
                         cmd_extract(args)
                         success_count += 1
