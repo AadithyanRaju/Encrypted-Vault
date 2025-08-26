@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
-from utils.maintain import cmd_rm
+from utils.maintain import cmd_rm, cmd_rotate_master
 from ui.ImageViewer import ImageViewer
 from ui.TextEditor import TextEditor
 from ui.PDFViewer import PDFViewer
@@ -22,7 +22,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
         def __init__(self, repo: Path):
             super().__init__()
             self.repo = repo
-            self.setWindowTitle("EFS – Vault Explorer")
+            self.setWindowTitle("EFS - Vault Explorer")
             self.resize(900, 600)
 
             central = QtWidgets.QWidget(self)
@@ -89,6 +89,11 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.remove_btn.clicked.connect(self.remove_files)
             self.remove_btn.setEnabled(False)
             btn_row.addWidget(self.remove_btn)
+
+            self.rotate_btn = QtWidgets.QPushButton("Change Master Password…")
+            self.rotate_btn.clicked.connect(self.change_master_password)
+            self.rotate_btn.setEnabled(False)
+            btn_row.addWidget(self.rotate_btn)
             
             layout.addLayout(btn_row)
 
@@ -110,6 +115,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.add_folder_btn.setEnabled(True)
             self.open_btn.setEnabled(True)
             self.remove_btn.setEnabled(True)
+            self.rotate_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
             self.deselect_all_btn.setEnabled(True)
 
@@ -434,6 +440,59 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     QtWidgets.QMessageBox.information(self, "Done", f"Saved to {out}")
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(self, "Error", str(e))
+
+        def change_master_password(self):
+            dlg = QtWidgets.QDialog(self)
+            dlg.setWindowTitle("Change Master Password")
+            v = QtWidgets.QVBoxLayout(dlg)
+
+            current_edit = QtWidgets.QLineEdit()
+            current_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            current_edit.setPlaceholderText("Current password")
+            # Pre-fill with current if present
+            current_edit.setText(self.pass_edit.text())
+
+            new_edit = QtWidgets.QLineEdit()
+            new_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            new_edit.setPlaceholderText("New password")
+
+            confirm_edit = QtWidgets.QLineEdit()
+            confirm_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            confirm_edit.setPlaceholderText("Confirm new password")
+
+            v.addWidget(QtWidgets.QLabel("Enter your passwords:"))
+            v.addWidget(current_edit)
+            v.addWidget(new_edit)
+            v.addWidget(confirm_edit)
+
+            btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+            v.addWidget(btns)
+            btns.accepted.connect(dlg.accept)
+            btns.rejected.connect(dlg.reject)
+
+            if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                return
+
+            curr = current_edit.text()
+            newp = new_edit.text()
+            conf = confirm_edit.text()
+
+            if not curr or not newp:
+                QtWidgets.QMessageBox.warning(self, "Missing", "Please fill all fields")
+                return
+            if newp != conf:
+                QtWidgets.QMessageBox.warning(self, "Mismatch", "New passwords do not match")
+                return
+
+            try:
+                args = argparse.Namespace(repo=str(self.repo), passphrase=curr, new_passphrase=newp, t=None, m=None, p=None)
+                cmd_rotate_master(args)
+                # Update UI to use new password and re-unlock
+                self.pass_edit.setText(newp)
+                self.unlock()
+                QtWidgets.QMessageBox.information(self, "Success", "Master password changed.")
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to change password: {str(e)}")
             else:
                 # Multiple files - use directory dialog
                 dlg = QtWidgets.QFileDialog(self)
