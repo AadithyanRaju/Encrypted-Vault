@@ -19,7 +19,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     class VaultApp(QtWidgets.QMainWindow):
-        def __init__(self, repo: Path):
+        def __init__(self, repo: Path = None):
             super().__init__()
             self.repo = repo
             self.setWindowTitle("EFS - Vault Explorer")
@@ -102,7 +102,127 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.current_editor = None
             self.current_file_id = None
 
+        def show_startup_dialog(self):
+            """Show dialog to create new repo or select existing one."""
+            dlg = QtWidgets.QDialog(self)
+            dlg.setWindowTitle("EFS - Welcome")
+            dlg.setModal(True)
+            dlg.resize(400, 200)
+            
+            layout = QtWidgets.QVBoxLayout(dlg)
+            
+            # Welcome message
+            welcome_label = QtWidgets.QLabel("Welcome to EFS - Encrypted File System")
+            welcome_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px;")
+            layout.addWidget(welcome_label)
+            
+            instruction_label = QtWidgets.QLabel("Choose an option:")
+            instruction_label.setStyleSheet("margin: 10px;")
+            layout.addWidget(instruction_label)
+            
+            # Buttons
+            create_btn = QtWidgets.QPushButton("Create a new repository")
+            create_btn.setMinimumHeight(40)
+            create_btn.clicked.connect(lambda: self.create_new_repo(dlg))
+            layout.addWidget(create_btn)
+            
+            select_btn = QtWidgets.QPushButton("Select an existing repository")
+            select_btn.setMinimumHeight(40)
+            select_btn.clicked.connect(lambda: self.select_existing_repo(dlg))
+            layout.addWidget(select_btn)
+            
+            # Show dialog
+            dlg.exec()
+
+        def create_new_repo(self, parent_dialog):
+            """Create a new repository."""
+            # Get directory for new repo
+            dlg = QtWidgets.QFileDialog(self)
+            repo_dir = dlg.getExistingDirectory(self, "Select directory for new repository")
+            if not repo_dir:
+                return
+            
+            repo_path = Path(repo_dir)
+            
+            # Get passphrase for new repo
+            pass_dlg = QtWidgets.QDialog(self)
+            pass_dlg.setWindowTitle("Set Master Password")
+            pass_dlg.setModal(True)
+            pass_layout = QtWidgets.QVBoxLayout(pass_dlg)
+            
+            pass_layout.addWidget(QtWidgets.QLabel("Set master password for new repository:"))
+            
+            pass_edit = QtWidgets.QLineEdit()
+            pass_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            pass_edit.setPlaceholderText("Master password")
+            pass_layout.addWidget(pass_edit)
+            
+            confirm_edit = QtWidgets.QLineEdit()
+            confirm_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+            confirm_edit.setPlaceholderText("Confirm password")
+            pass_layout.addWidget(confirm_edit)
+            
+            btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+            pass_layout.addWidget(btns)
+            btns.accepted.connect(pass_dlg.accept)
+            btns.rejected.connect(pass_dlg.reject)
+            
+            if pass_dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                return
+            
+            password = pass_edit.text()
+            confirm = confirm_edit.text()
+            
+            if not password or password != confirm:
+                QtWidgets.QMessageBox.warning(self, "Error", "Passwords do not match or are empty")
+                return
+            
+            try:
+                # Initialize new repo
+                from utils.core import cmd_init
+                init_args = argparse.Namespace(
+                    repo=str(repo_path),
+                    passphrase=password,
+                    t=4, m=262144, p=2, force=False
+                )
+                cmd_init(init_args)
+                
+                # Set repo and show main window
+                self.repo = repo_path
+                self.pass_edit.setText(password)
+                parent_dialog.close()
+                self.show()
+                self.unlock()
+                
+                QtWidgets.QMessageBox.information(self, "Success", f"Created new repository at {repo_path}")
+                
+            except Exception as e:
+                QtWidgets.QMessageBox.critical(self, "Error", f"Failed to create repository: {str(e)}")
+
+        def select_existing_repo(self, parent_dialog):
+            """Select an existing repository."""
+            dlg = QtWidgets.QFileDialog(self)
+            repo_dir = dlg.getExistingDirectory(self, "Select repository directory")
+            if not repo_dir:
+                return
+            
+            repo_path = Path(repo_dir)
+            vault_file = repo_path / "vault.enc"
+            
+            if not vault_file.exists():
+                QtWidgets.QMessageBox.warning(self, "Invalid Repository", "Selected directory does not contain a vault.enc file")
+                return
+            
+            # Set repo and show main window
+            self.repo = repo_path
+            parent_dialog.close()
+            self.show()
+
         def unlock(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             pw = self.pass_edit.text()
             try:
                 self.inner, self.kmaster, _ = unlock(self.repo, pw)
@@ -201,6 +321,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
             return selected
 
         def add_file(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             dlg = QtWidgets.QFileDialog(self)
             file_path, _ = dlg.getOpenFileName(self, "Select file to add to vault")
             if not file_path:
@@ -222,6 +346,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add file: {str(e)}")
 
         def add_folder(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             dlg = QtWidgets.QFileDialog(self)
             folder_path = dlg.getExistingDirectory(self, "Select folder to add to vault")
             if not folder_path:
@@ -327,6 +455,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 
         def remove_files(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             selected_files = self.get_selected_files()
             if not selected_files:
                 QtWidgets.QMessageBox.warning(self, "No Selection", "Please select files to remove")
@@ -381,6 +513,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to update file in vault: {str(e)}")
 
         def open_file(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             selected_files = self.get_selected_files()
             if not selected_files:
                 QtWidgets.QMessageBox.warning(self, "No Selection", "Please select a file to open")
@@ -442,6 +578,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     pass
 
         def extract_selected(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             selected_files = self.get_selected_files()
             if not selected_files:
                 QtWidgets.QMessageBox.warning(self, "No Selection", "Please select files to extract")
@@ -483,6 +623,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     QtWidgets.QMessageBox.critical(self, "Error", str(e))
 
         def change_master_password(self):
+            if not self.repo:
+                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                return
+                
             dlg = QtWidgets.QDialog(self)
             dlg.setWindowTitle("Change Master Password")
             v = QtWidgets.QVBoxLayout(dlg)
@@ -538,6 +682,16 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
     # Initialize QApplication with command line arguments for WebEngine compatibility
     app = QtWidgets.QApplication(sys.argv)
-    v = VaultApp(Path(args.repo))
-    v.show()
+    
+    # If no repo provided, show startup dialog
+    if not args.repo:
+        v = VaultApp()
+        v.show_startup_dialog()
+        # If no repo was set after dialog, exit
+        if not v.repo:
+            sys.exit(0)
+    else:
+        v = VaultApp(Path(args.repo))
+        v.show()
+    
     app.exec()

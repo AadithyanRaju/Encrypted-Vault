@@ -59,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rot.set_defaults(func=cmd_rotate_master)
 
     p_gui = sub.add_parser("gui", help="Launch minimal GUI")
-    p_gui.add_argument("repo", help="Path to repo directory")
+    p_gui.add_argument("repo", nargs="?", help="Path to repo directory (optional)")
     p_gui.set_defaults(func=cmd_gui)
 
     return p
