@@ -137,6 +137,16 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         item.setFirstColumnSpanned(False)
                         folders[key] = item
                         parent.addChild(item)
+                        # Add checkbox to folder node and wire it to toggle descendants
+                        folder_checkbox = QtWidgets.QCheckBox()
+                        folder_checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+                        self.tree.setItemWidget(item, 0, folder_checkbox)
+                        # Capture current item in a closure
+                        def make_handler(folder_item):
+                            def handler(state):
+                                self._set_descendants_checked(folder_item, state == QtCore.Qt.CheckState.Checked)
+                            return handler
+                        folder_checkbox.stateChanged.connect(make_handler(item))
                     parent = folders[key]
                 # Add file leaf
                 leaf = QtWidgets.QTreeWidgetItem(["", f.get("id", ""), f.get("name", ""), str(f.get("size", 0)), relpath])
@@ -145,6 +155,17 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 checkbox = QtWidgets.QCheckBox()
                 checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
                 self.tree.setItemWidget(leaf, 0, checkbox)
+
+        def _set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
+            # Recursively set all descendant file checkboxes
+            for i in range(item.childCount()):
+                child = item.child(i)
+                cb = self.tree.itemWidget(child, 0)
+                if cb is not None:
+                    cb.setChecked(checked)
+                # Recurse into folders
+                if child.childCount() > 0:
+                    self._set_descendants_checked(child, checked)
 
         def select_all(self):
             """Select all files in the table."""
@@ -440,6 +461,26 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     QtWidgets.QMessageBox.information(self, "Done", f"Saved to {out}")
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(self, "Error", str(e))
+            else:
+                # Multiple files - use directory dialog
+                dlg = QtWidgets.QFileDialog(self)
+                out_dir = dlg.getExistingDirectory(self, "Select directory to save files")
+                if not out_dir:
+                    return
+                
+                try:
+                    success_count = 0
+                    for fid, name, relpath in selected_files:
+                        # Recreate folder structure when extracting many
+                        out_path = Path(out_dir) / (relpath or name)
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
+                        args = argparse.Namespace(repo=str(self.repo), id=fid, out=str(out_path), passphrase=self.pass_edit.text())
+                        cmd_extract(args)
+                        success_count += 1
+                    
+                    QtWidgets.QMessageBox.information(self, "Done", f"Extracted {success_count} files to {out_dir}")
+                except Exception as e:
+                    QtWidgets.QMessageBox.critical(self, "Error", str(e))
 
         def change_master_password(self):
             dlg = QtWidgets.QDialog(self)
@@ -493,26 +534,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.information(self, "Success", "Master password changed.")
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to change password: {str(e)}")
-            else:
-                # Multiple files - use directory dialog
-                dlg = QtWidgets.QFileDialog(self)
-                out_dir = dlg.getExistingDirectory(self, "Select directory to save files")
-                if not out_dir:
-                    return
-                
-                try:
-                    success_count = 0
-                    for fid, name, relpath in selected_files:
-                        # Recreate folder structure when extracting many
-                        out_path = Path(out_dir) / (relpath or name)
-                        out_path.parent.mkdir(parents=True, exist_ok=True)
-                        args = argparse.Namespace(repo=str(self.repo), id=fid, out=str(out_path), passphrase=self.pass_edit.text())
-                        cmd_extract(args)
-                        success_count += 1
-                    
-                    QtWidgets.QMessageBox.information(self, "Done", f"Extracted {success_count} files to {out_dir}")
-                except Exception as e:
-                    QtWidgets.QMessageBox.critical(self, "Error", str(e))
+            
 
     # Initialize QApplication with command line arguments for WebEngine compatibility
     app = QtWidgets.QApplication(sys.argv)
