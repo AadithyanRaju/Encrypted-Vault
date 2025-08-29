@@ -5,6 +5,7 @@ import os
 
 from pathlib import Path
 
+from ui.VideoPlayer import VideoPlayer
 from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
 from utils.maintain import cmd_rm, cmd_rotate_master
 from ui.ImageViewer import ImageViewer
@@ -94,6 +95,11 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.rotate_btn.clicked.connect(self.change_master_password)
             self.rotate_btn.setEnabled(False)
             btn_row.addWidget(self.rotate_btn)
+            
+            self.close_btn = QtWidgets.QPushButton("Close Repository")
+            self.close_btn.clicked.connect(self.close_repo)
+            self.close_btn.setEnabled(True)
+            btn_row.addWidget(self.close_btn)
             
             layout.addLayout(btn_row)
 
@@ -236,6 +242,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.open_btn.setEnabled(True)
             self.remove_btn.setEnabled(True)
             self.rotate_btn.setEnabled(True)
+            # close button remains enabled
+            self.close_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
             self.deselect_all_btn.setEnabled(True)
 
@@ -493,6 +501,52 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to remove files: {str(e)}")
 
+        def close_repo(self):
+            """Close the currently opened repository and clear UI state."""
+            if not self.repo:
+                return
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                "Close Repository",
+                "Close the current repository and clear unlocked state?",
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                QtWidgets.QMessageBox.StandardButton.No,
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+
+            # Clear internal state
+            self.repo = None
+            self.inner = None
+            self.kmaster = None
+            self.current_editor = None
+            self.current_file_id = None
+            self.tree.clear()
+            self.pass_edit.clear()
+
+            # Disable controls
+            for btn in (
+                self.save_btn, self.add_btn, self.add_folder_btn, self.open_btn,
+                self.remove_btn, self.rotate_btn, self.select_all_btn, self.deselect_all_btn,
+                self.close_btn,
+            ):
+                try:
+                    btn.setEnabled(False)
+                except Exception:
+                    pass
+
+            #QtWidgets.QMessageBox.information(self, "Closed", "Repository closed.")
+
+            try:
+                self.hide()
+                self.show_startup_dialog()
+                if self.repo:
+                    self.show()
+                else:
+                    sys.exit(0)
+            except Exception:
+                pass
+
         def on_text_file_saved(self, file_path: str, content: str):
             """Handle when a text file is saved in the editor."""
             try:
@@ -559,6 +613,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     # Open PDF viewer
                     viewer = PDFViewer(temp_path, self)
                     viewer.exec()
+                elif mime_type and mime_type.startswith('video/'):
+                    player = VideoPlayer(temp_path, self)
+                    player.exec()
                 else:
                     # Open text editor for text files and unknown types
                     editor = TextEditor(temp_path, self)
@@ -680,14 +737,11 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 QtWidgets.QMessageBox.critical(self, "Error", f"Failed to change password: {str(e)}")
             
 
-    # Initialize QApplication with command line arguments for WebEngine compatibility
     app = QtWidgets.QApplication(sys.argv)
     
-    # If no repo provided, show startup dialog
     if not args.repo:
         v = VaultApp()
         v.show_startup_dialog()
-        # If no repo was set after dialog, exit
         if not v.repo:
             sys.exit(0)
     else:
@@ -695,3 +749,5 @@ def cmd_gui(args: argparse.Namespace) -> None:
         v.show()
     
     app.exec()
+
+   
