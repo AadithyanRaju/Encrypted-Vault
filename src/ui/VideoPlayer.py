@@ -1,0 +1,97 @@
+import sys
+import os
+from pathlib import Path
+
+try:
+    from PyQt6 import QtWidgets, QtGui, QtCore, QtMultimediaWidgets, QtMultimedia
+except Exception as e:
+    print("[!] PyQt6 not installed. pip install PyQt6")
+    sys.exit(1)
+
+class VideoPlayer(QtWidgets.QDialog):
+    def __init__(self, video_path: str, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Video Player")
+        self.resize(800, 600)
+        self.init_ui()
+        self.load_video(video_path)
+
+    def init_ui(self):
+        self.video_widget = QtMultimediaWidgets.QVideoWidget(self)
+        # Create audio output and media player
+        # Create audio output and media player. Set audio output before loading source.
+        self.audio_output = QtMultimedia.QAudioOutput(self)
+        try:
+            # set a reasonable default volume (0.0 - 1.0)
+            self.audio_output.setVolume(0.6)
+        except Exception:
+            pass
+        self.media_player = QtMultimedia.QMediaPlayer(self)
+        self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.setAudioOutput(self.audio_output)
+
+        self._temp_copy_path = None
+
+        self.play_button = QtWidgets.QPushButton("Play", self)
+        self.pause_button = QtWidgets.QPushButton("Pause", self)
+        self.stop_button = QtWidgets.QPushButton("Stop", self)
+
+        # Layout
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.addWidget(self.video_widget)
+        layout.addWidget(self.play_button)
+        layout.addWidget(self.pause_button)
+        layout.addWidget(self.stop_button)
+
+        self.setLayout(layout)
+
+        # Connect buttons
+        self.play_button.clicked.connect(self.media_player.play)
+        self.pause_button.clicked.connect(self.media_player.pause)
+        self.stop_button.clicked.connect(self.media_player.stop)
+
+    def load_video(self, video_path: str):
+        try:
+            import shutil
+            import tempfile
+            try:
+                if self._temp_copy_path and os.path.exists(self._temp_copy_path):
+                    os.remove(self._temp_copy_path)
+            except Exception:pass
+
+            suffix = Path(video_path).suffix
+            fd, tmpname = tempfile.mkstemp(suffix=suffix)
+            os.close(fd)
+            shutil.copy2(video_path, tmpname)
+            self._temp_copy_path = tmpname
+            url = QtCore.QUrl.fromLocalFile(self._temp_copy_path)
+            self.media_player.setSource(url)
+            self.media_player.play()
+        except Exception as e:
+            url = QtCore.QUrl.fromLocalFile(video_path)
+            self.media_player.setSource(url)
+            self.media_player.play()
+
+    def closeEvent(self, event):
+        try:self.media_player.stop()
+        except Exception:pass
+        try:
+            if self._temp_copy_path and os.path.exists(self._temp_copy_path):
+                os.remove(self._temp_copy_path)
+        except Exception:pass
+        return super().closeEvent(event)
+
+    def _on_media_error(self, err, err_str):
+        QtWidgets.QMessageBox.warning(self, "Playback error", f"Player error: {err_str}\nFalling back to external player.")
+        try:
+            import os
+            os.startfile(self._temp_copy_path)  # Windows: opens with default app (VLC if installed)
+        except Exception:
+            pass
+
+    def __del__(self):
+        try:
+            self.media_player.errorOccurred.disconnect(self._on_media_error)
+        except Exception:
+            pass
+
