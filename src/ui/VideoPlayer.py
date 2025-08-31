@@ -19,7 +19,6 @@ class VideoPlayer(QtWidgets.QDialog):
     def init_ui(self):
         self.video_widget = QtMultimediaWidgets.QVideoWidget(self)
         # Create audio output and media player
-        # Create audio output and media player. Set audio output before loading source.
         self.audio_output = QtMultimedia.QAudioOutput(self)
         try:
             # set a reasonable default volume (0.0 - 1.0)
