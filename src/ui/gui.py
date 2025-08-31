@@ -326,7 +326,19 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 if item is None:
                     return
                 if item.childCount() != 0:
-                    # folder node: do nothing here and let checkbox handlers control descendants
+                    # folder node: when user clicks the row (not the checkbox column),
+                    # treat that as selecting the entire folder: clear other selections
+                    # and check all descendants of this folder.
+                    if column == 0:
+                        # clicking the folder's checkbox - leave default multi-select behavior
+                        return
+                    # clear other selections and check this folder's descendants
+                    self._clear_all_checkboxes()
+                    folder_cb = self.tree.itemWidget(item, 0)
+                    if folder_cb is not None:
+                        folder_cb.setChecked(True)
+                    # check all descendant file checkboxes
+                    self.__set_descendants_checked(item, True)
                     return
                 # If user clicked the checkbox column directly, don't override (allow multi-select)
                 if column == 0:
