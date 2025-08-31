@@ -114,3 +114,28 @@ class AudioPlayer(QtWidgets.QDialog):
 
         # initialize label
         update_time_label()
+
+    def closeEvent(self, event: 'QtGui.QCloseEvent') -> None:
+        """Ensure playback is stopped and audio resources are released when the dialog closes."""
+        try:
+            # Stop playback
+            if getattr(self, 'player', None) is not None:
+                try:
+                    self.player.stop()
+                except Exception:
+                    pass
+            # Lower volume to avoid audio leaks
+            if getattr(self, 'audio_output', None) is not None:
+                try:
+                    self.audio_output.setVolume(0.0)
+                except Exception:
+                    pass
+        except Exception:
+            # Non-fatal cleanup error
+            pass
+
+        # Call the base implementation
+        try:
+            super().closeEvent(event)
+        except Exception:
+            event.accept()
