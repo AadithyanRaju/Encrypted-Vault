@@ -37,12 +37,17 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.pass_edit.setPlaceholderText("Master passphrase…")
             # Pressing Enter in the passphrase field should attempt to unlock
             self.pass_edit.returnPressed.connect(self.unlock)
-            open_btn = QtWidgets.QPushButton("Unlock Vault")
-            open_btn.clicked.connect(self.unlock)
+            self.open_vault_btn = QtWidgets.QPushButton("Unlock Vault")
+            self.open_vault_btn.clicked.connect(self.unlock)
+            # Lock button (replaces passphrase UI when vault is unlocked)
+            self.lock_btn = QtWidgets.QPushButton("Lock Vault")
+            self.lock_btn.clicked.connect(self.lock_vault)
+            self.lock_btn.setVisible(False)
 
             hl = QtWidgets.QHBoxLayout()
             hl.addWidget(self.pass_edit)
-            hl.addWidget(open_btn)
+            hl.addWidget(self.open_vault_btn)
+            hl.addWidget(self.lock_btn)
             layout.addLayout(hl)
 
             # Give keyboard focus to the passphrase field by default
@@ -258,6 +263,13 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.close_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
             self.deselect_all_btn.setEnabled(True)
+            # Hide passphrase UI and show lock button
+            try:
+                self.pass_edit.setVisible(False)
+                self.open_vault_btn.setVisible(False)
+            except Exception:
+                pass
+            self.lock_btn.setVisible(True)
 
         def populate(self):
             self.tree.clear()
@@ -658,6 +670,35 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     sys.exit(0)
             except Exception:
                 pass
+
+        def lock_vault(self):
+            """Lock the currently opened repository but keep the repo selected (allow re-unlock)."""
+            # Clear unlocked state but keep repo path
+            self.inner = None
+            self.kmaster = None
+            self.current_editor = None
+            self.current_file_id = None
+            self.tree.clear()
+
+            # Disable controls that require unlock
+            for btn in (
+                self.save_btn, self.add_btn, self.add_folder_btn, self.open_btn,
+                self.remove_btn, self.rotate_btn, self.select_all_btn, self.deselect_all_btn,
+            ):
+                try:
+                    btn.setEnabled(False)
+                except Exception:
+                    pass
+
+            # Show passphrase UI again and hide lock button
+            try:
+                self.pass_edit.clear()
+                self.pass_edit.setVisible(True)
+                self.open_vault_btn.setVisible(True)
+            except Exception:
+                pass
+            self.lock_btn.setVisible(False)
+            self.pass_edit.setFocus()
 
         def on_text_file_saved(self, file_path: str, content: str):
             """Handle when a text file is saved in the editor."""
