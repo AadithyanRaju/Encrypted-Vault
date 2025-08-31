@@ -5,6 +5,7 @@ import os
 
 from pathlib import Path
 
+from ui.AudioPlayer import AudioPlayer
 from ui.VideoPlayer import VideoPlayer
 from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
 from utils.maintain import cmd_rm, cmd_rotate_master
@@ -127,12 +128,12 @@ def cmd_gui(args: argparse.Namespace) -> None:
             layout.addWidget(instruction_label)
             
             # Buttons
-            create_btn = QtWidgets.QPushButton("Create a new repository")
+            create_btn = QtWidgets.QPushButton("Create a new vault")
             create_btn.setMinimumHeight(40)
             create_btn.clicked.connect(lambda: self.create_new_repo(dlg))
             layout.addWidget(create_btn)
             
-            select_btn = QtWidgets.QPushButton("Select an existing repository")
+            select_btn = QtWidgets.QPushButton("Select an existing vault")
             select_btn.setMinimumHeight(40)
             select_btn.clicked.connect(lambda: self.select_existing_repo(dlg))
             layout.addWidget(select_btn)
@@ -272,7 +273,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         # Capture current item in a closure
                         def make_handler(folder_item):
                             def handler(state):
-                                self._set_descendants_checked(folder_item, state == QtCore.Qt.CheckState.Checked)
+                                self.__set_descendants_checked(folder_item, state == QtCore.Qt.CheckState.Checked)
                             return handler
                         folder_checkbox.stateChanged.connect(make_handler(item))
                     parent = folders[key]
@@ -284,7 +285,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
                 self.tree.setItemWidget(leaf, 0, checkbox)
 
-        def _set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
+        def __set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
             # Recursively set all descendant file checkboxes
             for i in range(item.childCount()):
                 child = item.child(i)
@@ -293,7 +294,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     cb.setChecked(checked)
                 # Recurse into folders
                 if child.childCount() > 0:
-                    self._set_descendants_checked(child, checked)
+                    self.__set_descendants_checked(child, checked)
 
         def select_all(self):
             """Select all files in the table."""
@@ -615,6 +616,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     viewer.exec()
                 elif mime_type and mime_type.startswith('video/'):
                     player = VideoPlayer(temp_path, self)
+                    player.exec()
+                elif mime_type and mime_type.startswith('audio/'):
+                    player = AudioPlayer(temp_path, self)
                     player.exec()
                 else:
                     # Open text editor for text files and unknown types
