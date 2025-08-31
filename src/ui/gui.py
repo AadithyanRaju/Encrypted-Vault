@@ -35,6 +35,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.pass_edit = QtWidgets.QLineEdit()
             self.pass_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
             self.pass_edit.setPlaceholderText("Master passphrase…")
+            # Pressing Enter in the passphrase field should attempt to unlock
+            self.pass_edit.returnPressed.connect(self.unlock)
             open_btn = QtWidgets.QPushButton("Unlock Vault")
             open_btn.clicked.connect(self.unlock)
 
@@ -42,6 +44,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
             hl.addWidget(self.pass_edit)
             hl.addWidget(open_btn)
             layout.addLayout(hl)
+
+            # Give keyboard focus to the passphrase field by default
+            self.pass_edit.setFocus()
 
             # Selection controls
             select_layout = QtWidgets.QHBoxLayout()
