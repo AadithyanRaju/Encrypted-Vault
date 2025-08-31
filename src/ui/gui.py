@@ -117,6 +117,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.kmaster = None
             self.current_editor = None
             self.current_file_id = None
+            # track last clicked item to support Shift+click range selection
+            self._last_clicked_item = None
 
         def show_startup_dialog(self):
             """Show dialog to create new repo or select existing one."""
@@ -322,33 +324,85 @@ def cmd_gui(args: argparse.Namespace) -> None:
             Clicking the checkbox itself keeps normal multi-select behavior.
             """
             try:
-                # Only convert a single selection for leaf items (files). Folders are left to checkbox logic.
                 if item is None:
                     return
-                if item.childCount() != 0:
-                    # folder node: when user clicks the row (not the checkbox column),
-                    # treat that as selecting the entire folder: clear other selections
-                    # and check all descendants of this folder.
-                    if column == 0:
-                        # clicking the folder's checkbox - leave default multi-select behavior
+
+                modifiers = QtWidgets.QApplication.keyboardModifiers()
+
+                # Clicking the checkbox column should preserve default multi-select checkbox behavior
+                if column == 0:
+                    # update last clicked item for shift-range behavior
+                    self._last_clicked_item = item
+                    return
+
+                # Ctrl+click: toggle the clicked row's checkbox without changing others
+                if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
+                    cb = self.tree.itemWidget(item, 0)
+                    if cb is not None:
+                        cb.setChecked(not cb.isChecked())
+                    self._last_clicked_item = item
+                    return
+
+                # Shift+click: select a contiguous range from last clicked item to this one
+                if modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier and self._last_clicked_item is not None:
+                    # Build a flat list of tree items in visual order
+                    items = []
+                    it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+                    while it.value():
+                        items.append(it.value())
+                        it += 1
+
+                    try:
+                        i1 = items.index(self._last_clicked_item)
+                        i2 = items.index(item)
+                    except ValueError:
+                        # Fallback to single selection if items can't be located
+                        i1 = i2 = None
+
+                    if i1 is None or i2 is None:
+                        # fallback single select
+                        self._clear_all_checkboxes()
+                        cb = self.tree.itemWidget(item, 0)
+                        if cb is not None:
+                            cb.setChecked(True)
+                        self._last_clicked_item = item
                         return
-                    # clear other selections and check this folder's descendants
+
+                    start, end = sorted((i1, i2))
+                    self._clear_all_checkboxes()
+                    for idx in range(start, end + 1):
+                        it_item = items[idx]
+                        if it_item.childCount() != 0:
+                            # folder: check its checkbox and all descendants
+                            folder_cb = self.tree.itemWidget(it_item, 0)
+                            if folder_cb is not None:
+                                folder_cb.setChecked(True)
+                            self.__set_descendants_checked(it_item, True)
+                        else:
+                            cb = self.tree.itemWidget(it_item, 0)
+                            if cb is not None:
+                                cb.setChecked(True)
+
+                    self._last_clicked_item = item
+                    return
+
+                # Default (no modifiers): single-select the clicked item or folder contents
+                if item.childCount() != 0:
+                    # folder node clicked (non-checkbox column): select all descendants
                     self._clear_all_checkboxes()
                     folder_cb = self.tree.itemWidget(item, 0)
                     if folder_cb is not None:
                         folder_cb.setChecked(True)
-                    # check all descendant file checkboxes
                     self.__set_descendants_checked(item, True)
-                    return
-                # If user clicked the checkbox column directly, don't override (allow multi-select)
-                if column == 0:
+                    self._last_clicked_item = item
                     return
 
-                # Clear all other checkboxes and check the clicked item's checkbox
+                # Leaf item clicked normally: clear others and check this one only
                 self._clear_all_checkboxes()
                 cb = self.tree.itemWidget(item, 0)
                 if cb is not None:
                     cb.setChecked(True)
+                self._last_clicked_item = item
             except Exception:
                 # Non-critical UI handler: ignore unexpected errors
                 pass
