@@ -68,6 +68,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.tree.setColumnCount(5)
             self.tree.setHeaderLabels(["Select", "ID", "Name", "Size", "Relpath"])
             self.tree.header().setStretchLastSection(True)
+            # Only allow single visual selection in the tree; checkbox column is used for multi-select
+            self.tree.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+            # Clicking a row (not the checkbox) should select that single item via its checkbox
+            self.tree.itemClicked.connect(self._on_tree_item_clicked)
             layout.addWidget(self.tree)
 
             # Actions
@@ -300,6 +304,42 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 # Recurse into folders
                 if child.childCount() > 0:
                     self.__set_descendants_checked(child, checked)
+
+        def _clear_all_checkboxes(self) -> None:
+            """Uncheck every checkbox widget in the tree."""
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                cb = self.tree.itemWidget(item, 0)
+                if cb is not None:
+                    # Use setChecked to update UI; connected handlers will run as expected
+                    cb.setChecked(False)
+                it += 1
+
+        def _on_tree_item_clicked(self, item: 'QtWidgets.QTreeWidgetItem', column: int) -> None:
+            """Handle clicks on tree rows: if a leaf row (file) is clicked (any column except checkbox),
+            treat it as a single selection by clearing all checkboxes and checking only that row's checkbox.
+            Clicking the checkbox itself keeps normal multi-select behavior.
+            """
+            try:
+                # Only convert a single selection for leaf items (files). Folders are left to checkbox logic.
+                if item is None:
+                    return
+                if item.childCount() != 0:
+                    # folder node: do nothing here and let checkbox handlers control descendants
+                    return
+                # If user clicked the checkbox column directly, don't override (allow multi-select)
+                if column == 0:
+                    return
+
+                # Clear all other checkboxes and check the clicked item's checkbox
+                self._clear_all_checkboxes()
+                cb = self.tree.itemWidget(item, 0)
+                if cb is not None:
+                    cb.setChecked(True)
+            except Exception:
+                # Non-critical UI handler: ignore unexpected errors
+                pass
 
         def select_all(self):
             """Select all files in the table."""
