@@ -612,20 +612,86 @@ def cmd_gui(args: argparse.Namespace) -> None:
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                 try:
-                    # Remove each selected file
+                    # Unlock once and build id->entry map
+                    inner, kmaster, kdf = unlock(self.repo, self.pass_edit.text())
+                    id_to_entry = {f["id"]: f for f in inner.files}
+
+                    # Prepare tasks for parallel blob deletion
+                    targets = []  # (fid, blob_path)
                     for fid, name, _ in selected_files:
-                        rm_args = argparse.Namespace(
-                            repo=str(self.repo),
-                            id=fid,
-                            passphrase=self.pass_edit.text()
-                        )
-                        cmd_rm(rm_args)
-                    
-                    # Refresh the table
+                        entry = id_to_entry.get(fid)
+                        if entry:
+                            blob_path = Path(self.repo) / entry.get("blob", "")
+                            targets.append((fid, blob_path))
+
+                    if not targets:
+                        QtWidgets.QMessageBox.warning(self, "No Matches", "Selected items not found in vault metadata")
+                        return
+
+                    # Progress dialog
+                    progress = QtWidgets.QProgressDialog("Removing files from vault...", None, 0, len(targets), self)
+                    progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
+                    progress.setAutoClose(True)
+
+                    # Thread pool sized to CPU cores
+                    import os as _os
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
+                    max_workers = max(1, (_os.cpu_count() or 1))
+                    completed = 0
+                    success_ids = []
+                    failed = []  # (fid, error)
+
+                    def _unlink_blob(path: Path):
+                        try:
+                            path.unlink()
+                        except FileNotFoundError:
+                            # Treat missing blob as success for metadata cleanup
+                            return
+                        except Exception as e:
+                            raise e
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                        future_map = {}
+                        for fid, blob_path in targets:
+                            future = ex.submit(_unlink_blob, blob_path)
+                            future_map[future] = (fid, blob_path)
+
+                        for fut in as_completed(future_map):
+                            fid, blob_path = future_map[fut]
+                            progress.setLabelText(f"Removing: {id_to_entry.get(fid, {}).get('name', fid)}")
+                            try:
+                                fut.result()
+                                success_ids.append(fid)
+                            except Exception as e:
+                                failed.append((fid, str(e)))
+                            completed += 1
+                            progress.setValue(completed)
+
+                    # Update metadata once for all successful deletions
+                    if success_ids:
+                        remaining = [f for f in inner.files if f["id"] not in success_ids]
+                        inner.files = remaining
+                        inner_bytes = inner.to_bytes()
+                        new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
+                        p = repo_paths(self.repo)
+                        save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+
+                    # Refresh UI
                     self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
                     self.populate()
-                    
-                    QtWidgets.QMessageBox.information(self, "Success", f"Removed {len(selected_files)} file(s) from vault")
+
+                    # Report outcome
+                    if failed:
+                        msg = f"Removed {len(success_ids)} file(s).\n\nFailed to remove {len(failed)}:"
+                        # show up to 5 failures
+                        for fid, err in failed[:5]:
+                            name = id_to_entry.get(fid, {}).get("name", fid)
+                            msg += f"\n• {name}: {err}"
+                        if len(failed) > 5:
+                            msg += f"\n... and {len(failed) - 5} more"
+                        QtWidgets.QMessageBox.warning(self, "Partial Success", msg)
+                    else:
+                        QtWidgets.QMessageBox.information(self, "Success", f"Removed {len(success_ids)} file(s) from vault")
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to remove files: {str(e)}")
 
