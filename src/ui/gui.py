@@ -114,7 +114,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.rotate_btn.setEnabled(False)
             btn_row.addWidget(self.rotate_btn)
             
-            self.close_btn = QtWidgets.QPushButton("Close Repository")
+            self.close_btn = QtWidgets.QPushButton("Close Vault")
             self.close_btn.clicked.connect(self.close_repo)
             self.close_btn.setEnabled(True)
             btn_row.addWidget(self.close_btn)
@@ -125,8 +125,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.kmaster = None
             self.current_editor = None
             self.current_file_id = None
-            # track last clicked item to support Shift+click range selection
-            self._last_clicked_item = None
+            self._last_clicked_item = None      # track last clicked item to support Shift+click range selection
 
         def show_startup_dialog(self):
             """Show dialog to create new repo or select existing one."""
@@ -522,61 +521,63 @@ def cmd_gui(args: argparse.Namespace) -> None:
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                 try:
-                    success_count = 0
+                    # Unlock once to get inner, kmaster, and KDF params
+                    inner, kmaster, kdf = unlock(self.repo, self.pass_edit.text())
+
+                    success_entries = []
                     failed_files = []
-                    
-                    # Show progress dialog
+
+                    # Progress dialog
                     progress = QtWidgets.QProgressDialog("Adding files to vault...", "Cancel", 0, len(files_to_add), self)
                     progress.setWindowModality(QtCore.Qt.WindowModality.WindowModal)
                     progress.setAutoClose(False)
-                    
-                    for i, (file_path, rel_path) in enumerate(files_to_add):
-                        progress.setValue(i)
-                        progress.setLabelText(f"Adding: {rel_path}")
-                        
-                        if progress.wasCanceled():
-                            break
-                        
-                        try:
-                            # Create a temporary file with the relative path as name to preserve structure
-                            import tempfile
-                            import shutil
-                            
-                            # Create a temporary directory structure
-                            temp_dir = tempfile.mkdtemp()
-                            temp_file_path = Path(temp_dir) / rel_path
-                            
-                            # Create parent directories if they don't exist
-                            temp_file_path.parent.mkdir(parents=True, exist_ok=True)
-                            
-                            # Copy the file to the temporary location with relative path
-                            shutil.copy2(file_path, temp_file_path)
-                            
-                            # Prefix relpath with selected folder name to keep top-level folder
-                            prefixed_rel = Path(folder_path.name) / rel_path
-                            add_args = argparse.Namespace(
-                                repo=str(self.repo),
-                                path=str(file_path),
-                                relpath=str(prefixed_rel),
-                                passphrase=self.pass_edit.text()
-                            )
-                            cmd_add(add_args)
-                            success_count += 1
-                            
-                            # No temp cleanup needed now
-                            
-                        except Exception as e:
-                            failed_files.append((str(rel_path), str(e)))
-                        finally:
-                            pass
-                    
-                    progress.setValue(len(files_to_add))
-                    
-                    # Refresh the table
+
+                    # Prepare tasks: (file_path, prefixed_rel)
+                    tasks = [(file_path, str(Path(folder_path.name) / rel_path)) for file_path, rel_path in files_to_add]
+
+                    # Thread pool equal to CPU cores
+                    import os as _os
+                    from concurrent.futures import ThreadPoolExecutor, as_completed
+                    max_workers = max(1, (_os.cpu_count() or 1))
+                    completed = 0
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+                        future_map = {}
+                        for file_path, relp in tasks:
+                            future = ex.submit(prepare_file_add, self.repo, Path(file_path), relp, kmaster)
+                            future_map[future] = (file_path, relp)
+
+                        for fut in as_completed(future_map):
+                            file_path, relp = future_map[fut]
+                            progress.setLabelText(f"Adding: {relp}")
+                            try:
+                                entry = fut.result()
+                                success_entries.append(entry)
+                            except Exception as e:
+                                failed_files.append((str(relp), str(e)))
+                            completed += 1
+                            progress.setValue(completed)
+                            if progress.wasCanceled():
+                                break
+
+                    # If canceled, do not write partial metadata changes (blobs already written remain orphaned)
+                    if progress.wasCanceled():
+                        QtWidgets.QMessageBox.information(self, "Canceled", "Folder add canceled. Some blobs may have been written.")
+                    else:
+                        # Merge entries and save vault once
+                        for entry in success_entries:
+                            inner.files.append(entry.to_dict())
+                        inner_bytes = inner.to_bytes()
+                        new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
+                        p = repo_paths(self.repo)
+                        save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+
+                    # Refresh UI state
                     self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
                     self.populate()
-                    
+
                     # Show results
+                    success_count = len(success_entries)
                     if failed_files:
                         error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
                         error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
@@ -585,7 +586,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
                     else:
                         QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
-                        
+
                 except Exception as e:
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 

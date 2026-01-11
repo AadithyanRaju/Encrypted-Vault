@@ -13,6 +13,38 @@ from storage.vault import save_vault, load_vault
 from utils.helper import repo_paths, rel_time_iso
 from utils.dataModels import InnerMetadata, KeyWrap, FileEntry
 
+def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: bytes) -> FileEntry:
+    p = repo_paths(repo)
+    file_key = os.urandom(32)
+    plaintext = src.read_bytes()
+    file_nonce = os.urandom(12)
+    file_ct = AESGCM(file_key).encrypt(file_nonce, plaintext, None)
+
+    fid = str(uuid.uuid4())
+    blob_path = p["blobs"] / f"{fid}.bin"
+    with blob_path.open("wb") as f:
+        f.write(file_nonce + file_ct)
+
+    wrap_nonce, wrap_ct = aead_encrypt(kmaster, file_key)
+    import base64
+    keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
+
+    # normalize relpath to POSIX style if provided
+    relpath_value = str(Path(relpath).as_posix()) if relpath else None
+
+    entry = FileEntry(
+        id=fid,
+        name=src.name,
+        relpath=relpath_value,
+        blob=f"blobs/{fid}.bin",
+        size=len(plaintext),
+        created_at=rel_time_iso(os.path.getctime(src)),
+        modified_at=rel_time_iso(os.path.getmtime(src)),
+        mimetype=None,
+        file_key_wrap=keywrap,
+    )
+    return entry
+
 def cmd_init(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
     repo.mkdir(parents=True, exist_ok=True)
