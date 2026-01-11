@@ -4,6 +4,7 @@ from ui.gui import cmd_gui
 from utils.core import cmd_add, cmd_ls, cmd_extract, cmd_init
 from utils.dataModels import DEFAULT_T_COST, DEFAULT_M_COST_KiB, DEFAULT_PARALLELISM
 from utils.maintain import cmd_rename, cmd_rm, cmd_rotate_master
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Encrypted File System (GitHub-ready, opaque vault)")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -11,9 +12,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = sub.add_parser("init", help="Initialize vault")
     p_init.add_argument("repo", help="Path to repo directory")
     p_init.add_argument("--passphrase", required=True)
-    p_init.add_argument("-t", type=int, default=DEFAULT_T_COST, help="Argon2 time cost (iterations)")
-    p_init.add_argument("-m", type=int, default=DEFAULT_M_COST_KiB, help="Argon2 memory (KiB)")
-    p_init.add_argument("-p", type=int, default=DEFAULT_PARALLELISM, help="Argon2 parallelism")
+    p_init.add_argument("-t", type=int, default=DEFAULT_T_COST, help=f"Argon2 time cost (iterations), DEFAULT={DEFAULT_T_COST}")
+    p_init.add_argument("-m", type=int, default=DEFAULT_M_COST_KiB, help=f"Argon2 memory (KiB), DEFAULT={DEFAULT_M_COST_KiB}")
+    p_init.add_argument("-p", type=int, default=DEFAULT_PARALLELISM, help=f"Argon2 parallelism, DEFAULT={DEFAULT_PARALLELISM}")
     p_init.add_argument("--force", action="store_true", help="Overwrite existing vault.enc if present")
     p_init.set_defaults(func=cmd_init)
 
@@ -57,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_rot.add_argument("-m", type=int, help="New Argon2 memory (KiB)")
     p_rot.add_argument("-p", type=int, help="New Argon2 parallelism")
     p_rot.set_defaults(func=cmd_rotate_master)
+
 
     p_gui = sub.add_parser("gui", help="Launch minimal GUI")
     p_gui.add_argument("repo", nargs="?", help="Path to repo directory (optional)")

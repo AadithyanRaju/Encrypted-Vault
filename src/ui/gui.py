@@ -7,7 +7,10 @@ from pathlib import Path
 
 from ui.AudioPlayer import AudioPlayer
 from ui.VideoPlayer import VideoPlayer
-from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault
+from utils.core import unlock, cmd_extract, cmd_add, update_file_in_vault, prepare_file_add
+from crypto.aead import aead_encrypt
+from storage.vault import save_vault
+from utils.helper import repo_paths
 from utils.maintain import cmd_rm, cmd_rotate_master
 from ui.ImageViewer import ImageViewer
 from ui.TextEditor import TextEditor

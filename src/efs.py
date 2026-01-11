@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Encrypted File System (EFS) – GitHub-friendly layout (ALL metadata encrypted)
+Encrypted File System (EFS) - GitHub-friendly layout (ALL metadata encrypted)
 
 Changes in this version:
 - Replaces JSON envelope `data.enc` with a **binary vault file** `vault.enc`.
@@ -19,8 +19,8 @@ Binary header (big-endian):
     nonce     : 12 bytes
     ciphertext: remaining bytes (AES-256-GCM over inner JSON)
 
-Repo layout:
-  repo/
+Vault layout:
+  vault/
     vault.enc             # opaque binary (no readable JSON)
     blobs/
       <uuid>.bin         # binary: 12-byte nonce || AES-256-GCM(ciphertext)
@@ -41,9 +41,16 @@ Security choices:
   - Kmaster = Argon2id(SHA3-512(passphrase)) -> 32 bytes or 256 bits
 """
 from __future__ import annotations
+import argparse
+import sys
 from ui.cli import build_parser
+from ui.gui import cmd_gui
 
 def main():
+    if len(sys.argv) == 1:
+        cmd_gui(argparse.Namespace(repo=None))
+        return
+        
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)

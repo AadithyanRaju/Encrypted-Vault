@@ -67,17 +67,6 @@ class PDFViewer(QtWidgets.QDialog):
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setSpacing(10)
         
-        # Zoom controls
-        zoom_in_btn = QtWidgets.QPushButton("Zoom In")
-        zoom_in_btn.setMinimumWidth(80)
-        zoom_in_btn.clicked.connect(self.zoom_in)
-        btn_layout.addWidget(zoom_in_btn)
-        
-        zoom_out_btn = QtWidgets.QPushButton("Zoom Out")
-        zoom_out_btn.setMinimumWidth(80)
-        zoom_out_btn.clicked.connect(self.zoom_out)
-        btn_layout.addWidget(zoom_out_btn)
-        
         # Reload button
         reload_btn = QtWidgets.QPushButton("Reload")
         reload_btn.setMinimumWidth(80)
@@ -150,19 +139,7 @@ class PDFViewer(QtWidgets.QDialog):
         else:
             self.status_label.setText("Failed to load PDF")
             self.status_label.setStyleSheet("color: red;")
-    
-    def zoom_in(self):
-        """Increase zoom level."""
-        if hasattr(self, 'web_view'):
-            self.zoom_factor *= 1.2
-            self.web_view.setZoomFactor(self.zoom_factor)
-    
-    def zoom_out(self):
-        """Decrease zoom level."""
-        if hasattr(self, 'web_view'):
-            self.zoom_factor /= 1.2
-            self.web_view.setZoomFactor(self.zoom_factor)
-    
+        
     def reload_pdf(self):
         """Reload the PDF file."""
         if hasattr(self, 'web_view'):
