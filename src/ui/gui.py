@@ -76,6 +76,11 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.tree.setColumnCount(5)
             self.tree.setHeaderLabels(["Select", "ID", "Name", "Size", "Relpath"])
             self.tree.header().setStretchLastSection(True)
+            # Ensure checkbox column is wide enough for nested items
+            try:
+                self.tree.setColumnWidth(0, 100)
+            except Exception:
+                pass
             # Only allow single visual selection in the tree; checkbox column is used for multi-select
             self.tree.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
             # Clicking a row (not the checkbox) should select that single item via its checkbox
@@ -293,7 +298,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         parent.addChild(item)
                         # Add checkbox to folder node and wire it to toggle descendants
                         folder_checkbox = QtWidgets.QCheckBox()
-                        folder_checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+                        # Keep small margins so nested indentation doesn't hide the widget
+                        folder_checkbox.setStyleSheet("margin-left:4px; margin-right:4px;")
                         self.tree.setItemWidget(item, 0, folder_checkbox)
                         # Capture current item in a closure
                         def make_handler(folder_item):
@@ -307,7 +313,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 parent.addChild(leaf)
                 # Add a checkbox widget on column 0
                 checkbox = QtWidgets.QCheckBox()
-                checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+                checkbox.setStyleSheet("margin-left:4px; margin-right:4px;")
                 self.tree.setItemWidget(leaf, 0, checkbox)
 
         def __set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
