@@ -577,6 +577,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             )
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+                progress = None
                 try:
                     # Unlock once to get inner, kmaster, and KDF params
                     inner, kmaster, kdf = unlock(self.repo, self.pass_edit.text())
@@ -619,6 +620,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
                     # If canceled, do not write partial metadata changes (blobs already written remain orphaned)
                     if progress.wasCanceled():
+                        progress.close()
+                        progress = None
                         QtWidgets.QMessageBox.information(self, "Canceled", "Folder add canceled. Some blobs may have been written.")
                     else:
                         # Merge entries and save vault once
@@ -629,22 +632,29 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         p = repo_paths(self.repo)
                         save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
 
-                    # Refresh UI state
-                    self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
-                    self.populate()
+                        # Refresh UI state
+                        self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
+                        self.populate()
 
-                    # Show results
-                    success_count = len(success_entries)
-                    if failed_files:
-                        error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
-                        error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
-                        if len(failed_files) > 5:
-                            error_msg += f"\n... and {len(failed_files) - 5} more failures"
-                        QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
-                    else:
-                        QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
+                        # Close progress dialog before showing result
+                        progress.close()
+                        progress = None
+
+                        # Show results
+                        success_count = len(success_entries)
+                        if failed_files:
+                            error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
+                            error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
+                            if len(failed_files) > 5:
+                                error_msg += f"\n... and {len(failed_files) - 5} more failures"
+                            QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
+                        else:
+                            QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
 
                 except Exception as e:
+                    if progress:
+                        progress.close()
+                        progress = None
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 
         def remove_files(self):
