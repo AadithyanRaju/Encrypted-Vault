@@ -117,10 +117,10 @@ class ImageViewer(QtWidgets.QDialog):
         self.setWindowTitle(f"Image Viewer - {self.windowTitle().split(' - ')[-1].split(' (')[0]} ({int(self._scale*100)}%)")
 
     def _set_scale(self, scale: float):
-        ns = max(self._min_scale, min(self._max_scale, scale))
-        if abs(ns - self._scale) < 1e-6:
+        clamped_scale = max(self._min_scale, min(self._max_scale, scale))
+        if abs(clamped_scale - self._scale) < 1e-6:
             return
-        self._scale = ns
+        self._scale = clamped_scale
         self._update_pixmap_scaled()
 
     def _zoom_by(self, factor: float):
