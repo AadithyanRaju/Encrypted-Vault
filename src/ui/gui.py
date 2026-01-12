@@ -3,17 +3,17 @@ import sys
 from pathlib import Path
 
 # Import modular GUI components
-from ui.gui.dialogs import show_startup_dialog, show_change_master_password_dialog
-from ui.gui.tree_operations import (
+from ui.gui_components.dialogs import show_startup_dialog, show_change_master_password_dialog
+from ui.gui_components.tree_operations import (
     populate_tree, filter_tree_items, set_descendants_checked,
     select_all_items, deselect_all_items, get_selected_files,
     handle_tree_item_clicked
 )
-from ui.gui.file_operations import (
+from ui.gui_components.file_operations import (
     add_single_file, add_folder, remove_selected_files,
     open_file_viewer, extract_selected_files
 )
-from ui.gui.vault_operations import (
+from ui.gui_components.vault_operations import (
     unlock_vault, lock_vault, close_repository,
     change_master_password, save_text_file_to_vault
 )
@@ -167,7 +167,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             set_descendants_checked(self.tree, item, checked)
 
         def _clear_all_checkboxes(self) -> None:
-            from ui.gui.tree_operations import clear_all_checkboxes
+            from ui.gui_components.tree_operations import clear_all_checkboxes
             clear_all_checkboxes(self.tree)
 
         def _on_tree_item_clicked(self, item: 'QtWidgets.QTreeWidgetItem', column: int) -> None:

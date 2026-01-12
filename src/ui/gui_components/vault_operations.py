@@ -155,7 +155,7 @@ def close_repository(parent_window):
     try:
         parent_window.hide()
         # Import here to avoid circular import
-        from ui.gui.dialogs import show_startup_dialog
+        from ui.gui_components.dialogs import show_startup_dialog
         show_startup_dialog(parent_window)
         if parent_window.repo:
             parent_window.show()
