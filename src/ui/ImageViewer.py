@@ -10,10 +10,12 @@ except Exception as e:
 class ImageViewer(QtWidgets.QDialog):
     # Epsilon for floating-point scale comparison
     SCALE_EPSILON = 1e-6
+    ZOOM_FACTOR = 1.15  # Zoom step factor for buttons and wheel
     
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Image Viewer - {Path(image_path).name}")
+        self._filename = Path(image_path).name
+        self.setWindowTitle(f"Image Viewer - {self._filename}")
         self.resize(800, 600)
         self._pixmap_orig = None
         self._scale = 1.0
@@ -75,8 +77,8 @@ class ImageViewer(QtWidgets.QDialog):
         layout.addWidget(close_btn)
 
         # Wire controls
-        self.zoom_in_btn.clicked.connect(lambda: self._zoom_by(1.15))
-        self.zoom_out_btn.clicked.connect(lambda: self._zoom_by(1.0/1.15))
+        self.zoom_in_btn.clicked.connect(lambda: self._zoom_by(self.ZOOM_FACTOR))
+        self.zoom_out_btn.clicked.connect(lambda: self._zoom_by(1.0/self.ZOOM_FACTOR))
         self.fit_btn.clicked.connect(self._fit_to_window)
         self.actual_btn.clicked.connect(self._actual_size)
         self.zoom_slider.valueChanged.connect(self._slider_changed)
@@ -94,7 +96,7 @@ class ImageViewer(QtWidgets.QDialog):
                 delta = event.angleDelta().y()
                 if delta == 0:
                     return False
-                factor = 1.15 if delta > 0 else (1.0/1.15)
+                factor = self.ZOOM_FACTOR if delta > 0 else (1.0/self.ZOOM_FACTOR)
                 self._zoom_by(factor)
                 event.accept()
                 return True
@@ -105,25 +107,25 @@ class ImageViewer(QtWidgets.QDialog):
     def _update_pixmap_scaled(self):
         if self._pixmap_orig is None:
             return
-        w = max(1, int(self._pixmap_orig.width() * self._scale))
-        h = max(1, int(self._pixmap_orig.height() * self._scale))
-        scaled = self._pixmap_orig.scaled(w, h, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+        scaled_width = max(1, int(self._pixmap_orig.width() * self._scale))
+        scaled_height = max(1, int(self._pixmap_orig.height() * self._scale))
+        scaled = self._pixmap_orig.scaled(scaled_width, scaled_height, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
         self.image_label.setPixmap(scaled)
         self.image_label.setFixedSize(scaled.size())
         val = int(round(self._scale * 100))
         if val != self.zoom_slider.value():
-            bs = self.zoom_slider.blockSignals(True)
+            old_block_state = self.zoom_slider.blockSignals(True)
             try:
                 self.zoom_slider.setValue(max(self.zoom_slider.minimum(), min(self.zoom_slider.maximum(), val)))
             finally:
-                self.zoom_slider.blockSignals(bs)
+                self.zoom_slider.blockSignals(old_block_state)
         self.setWindowTitle(f"Image Viewer - {self.windowTitle().split(' - ')[-1].split(' (')[0]} ({int(self._scale*100)}%)")
 
     def _set_scale(self, scale: float):
-        ns = max(self._min_scale, min(self._max_scale, scale))
-        if abs(ns - self._scale) < self.SCALE_EPSILON:
+        clamped_scale = max(self._min_scale, min(self._max_scale, scale))
+        if abs(clamped_scale - self._scale) < self.SCALE_EPSILON:
             return
-        self._scale = ns
+        self._scale = clamped_scale
         self._update_pixmap_scaled()
 
     def _zoom_by(self, factor: float):
