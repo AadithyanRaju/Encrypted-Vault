@@ -631,23 +631,23 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         p = repo_paths(self.repo)
                         save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
 
-                    # Refresh UI state
-                    self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
-                    self.populate()
+                        # Refresh UI state
+                        self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
+                        self.populate()
 
-                    # Close progress dialog before showing result
-                    progress.close()
+                        # Close progress dialog before showing result
+                        progress.close()
 
-                    # Show results
-                    success_count = len(success_entries)
-                    if failed_files:
-                        error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
-                        error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
-                        if len(failed_files) > 5:
-                            error_msg += f"\n... and {len(failed_files) - 5} more failures"
-                        QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
-                    else:
-                        QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
+                        # Show results
+                        success_count = len(success_entries)
+                        if failed_files:
+                            error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
+                            error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
+                            if len(failed_files) > 5:
+                                error_msg += f"\n... and {len(failed_files) - 5} more failures"
+                            QtWidgets.QMessageBox.warning(self, "Partial Success", error_msg)
+                        else:
+                            QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
 
                 except Exception as e:
                     if progress:
