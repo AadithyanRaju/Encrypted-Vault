@@ -654,6 +654,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 except Exception as e:
                     if progress:
                         progress.close()
+                        progress = None
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 
         def remove_files(self):
