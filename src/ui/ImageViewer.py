@@ -8,6 +8,9 @@ except Exception as e:
     sys.exit(1)
 
 class ImageViewer(QtWidgets.QDialog):
+    # Epsilon for floating-point scale comparison
+    SCALE_EPSILON = 1e-6
+    
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Image Viewer - {Path(image_path).name}")
@@ -118,7 +121,7 @@ class ImageViewer(QtWidgets.QDialog):
 
     def _set_scale(self, scale: float):
         ns = max(self._min_scale, min(self._max_scale, scale))
-        if abs(ns - self._scale) < 1e-6:
+        if abs(ns - self._scale) < self.SCALE_EPSILON:
             return
         self._scale = ns
         self._update_pixmap_scaled()
