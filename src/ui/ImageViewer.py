@@ -104,7 +104,7 @@ class ImageViewer(QtWidgets.QDialog):
             return
         w = max(1, int(self._pixmap_orig.width() * self._scale))
         h = max(1, int(self._pixmap_orig.height() * self._scale))
-        scaled = self._pixmap_orig.scaled(w, h, QtCore.Qt.AspectRatioMode.IgnoreAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
+        scaled = self._pixmap_orig.scaled(w, h, QtCore.Qt.AspectRatioMode.KeepAspectRatio, QtCore.Qt.TransformationMode.SmoothTransformation)
         self.image_label.setPixmap(scaled)
         self.image_label.setFixedSize(scaled.size())
         val = int(round(self._scale * 100))
