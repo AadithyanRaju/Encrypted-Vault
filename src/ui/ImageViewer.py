@@ -119,7 +119,7 @@ class ImageViewer(QtWidgets.QDialog):
                 self.zoom_slider.setValue(max(self.zoom_slider.minimum(), min(self.zoom_slider.maximum(), val)))
             finally:
                 self.zoom_slider.blockSignals(old_block_state)
-        self.setWindowTitle(f"Image Viewer - {self.windowTitle().split(' - ')[-1].split(' (')[0]} ({int(self._scale*100)}%)")
+        self.setWindowTitle(f"Image Viewer - {self._filename} ({int(self._scale*100)}%)")
 
     def _set_scale(self, scale: float):
         clamped_scale = max(self._min_scale, min(self._max_scale, scale))
