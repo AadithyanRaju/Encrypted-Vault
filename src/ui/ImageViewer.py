@@ -180,9 +180,11 @@ class ImageViewer(QtWidgets.QDialog):
                 )
             except RuntimeError:
                 # If the message box cannot be shown (e.g., in headless environments),
-                # still ensure a valid scale is set.
+                # silently continue
                 pass
-            self._set_scale(1.0)
+            finally:
+                # Always set a valid scale regardless of whether the message box was shown
+                self._set_scale(1.0)
             return
         scale_x = viewport_size.width() / self._pixmap_orig.width()
         scale_y = viewport_size.height() / self._pixmap_orig.height()
