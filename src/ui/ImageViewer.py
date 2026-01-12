@@ -40,8 +40,8 @@ class ImageViewer(QtWidgets.QDialog):
         self.image_label.setScaledContents(False)
         
         # Load and display image
-        pixmap = QtGui.QPixmap(image_path)
         self._image_loaded = False
+        pixmap = QtGui.QPixmap(image_path)
         if pixmap.isNull():
             self.image_label.setText("Failed to load image")
         else:
@@ -178,7 +178,7 @@ class ImageViewer(QtWidgets.QDialog):
                     "Cannot fit image to window because it has zero width or height.\n"
                     "Showing the image at 100% zoom instead."
                 )
-            except Exception:
+            except RuntimeError:
                 # If the message box cannot be shown (e.g., in headless environments),
                 # still ensure a valid scale is set.
                 pass
