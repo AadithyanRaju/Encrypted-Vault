@@ -266,8 +266,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 self.inner, self.kmaster, _ = unlock(self.repo, pw)
             except Exception as e:
                 # Check if this is a wrong password error (InvalidTag from AESGCM)
-                error_str = str(e)
-                if "InvalidTag" in str(type(e)) or "InvalidTag" in error_str:
+                from cryptography.exceptions import InvalidTag
+                if isinstance(e, InvalidTag):
                     msg_box = QtWidgets.QMessageBox(self)
                     msg_box.setIcon(QtWidgets.QMessageBox.Icon.Critical)
                     msg_box.setWindowTitle("Wrong Password")
