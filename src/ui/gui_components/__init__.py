@@ -1,0 +1,1 @@
+"""GUI modular components package."""
