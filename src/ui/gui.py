@@ -621,6 +621,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     # If canceled, do not write partial metadata changes (blobs already written remain orphaned)
                     if progress.wasCanceled():
                         progress.close()
+                        progress = None
                         QtWidgets.QMessageBox.information(self, "Canceled", "Folder add canceled. Some blobs may have been written.")
                     else:
                         # Merge entries and save vault once
@@ -637,6 +638,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
                         # Close progress dialog before showing result
                         progress.close()
+                        progress = None
 
                         # Show results
                         success_count = len(success_entries)
