@@ -83,9 +83,9 @@ class ImageViewer(QtWidgets.QDialog):
         self.actual_btn.clicked.connect(self._actual_size)
         self.zoom_slider.valueChanged.connect(self._slider_changed)
 
-        # Initial fit
+        # Initial fit - deferred to ensure viewport has correct size
         if self._pixmap_orig is not None:
-            self._fit_to_window()
+            QtCore.QTimer.singleShot(0, self._fit_to_window)
 
     def eventFilter(self, obj, event):
         # Only zoom when Ctrl is held; otherwise let wheel scroll normally
