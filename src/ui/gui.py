@@ -339,7 +339,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 return
             
             # First pass: collect matching files and their parent folders
-            items_to_show = []
+            # Use a set of object IDs for O(1) lookup (QTreeWidgetItems aren't hashable)
+            items_to_show_ids = set()
             it = QtWidgets.QTreeWidgetItemIterator(self.tree)
             while it.value():
                 item = it.value()
@@ -352,20 +353,18 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     # Check if search text matches name or relpath
                     if search_text in file_name or search_text in file_relpath:
                         # Mark this file and all parent folders to be shown
-                        if item not in items_to_show:
-                            items_to_show.append(item)
+                        items_to_show_ids.add(id(item))
                         parent = item.parent()
                         while parent is not None:
-                            if parent not in items_to_show:
-                                items_to_show.append(parent)
+                            items_to_show_ids.add(id(parent))
                             parent = parent.parent()
                 it += 1
             
-            # Second pass: show/hide all items based on the collected list
+            # Second pass: show/hide all items based on the collected IDs
             it = QtWidgets.QTreeWidgetItemIterator(self.tree)
             while it.value():
                 item = it.value()
-                item.setHidden(item not in items_to_show)
+                item.setHidden(id(item) not in items_to_show_ids)
                 it += 1
 
         def __set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
