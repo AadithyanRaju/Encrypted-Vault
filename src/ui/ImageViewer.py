@@ -109,11 +109,11 @@ class ImageViewer(QtWidgets.QDialog):
         self.image_label.setFixedSize(scaled.size())
         val = int(round(self._scale * 100))
         if val != self.zoom_slider.value():
-            bs = self.zoom_slider.blockSignals(True)
+            old_block_state = self.zoom_slider.blockSignals(True)
             try:
                 self.zoom_slider.setValue(max(self.zoom_slider.minimum(), min(self.zoom_slider.maximum(), val)))
             finally:
-                self.zoom_slider.blockSignals(bs)
+                self.zoom_slider.blockSignals(old_block_state)
         self.setWindowTitle(f"Image Viewer - {self.windowTitle().split(' - ')[-1].split(' (')[0]} ({int(self._scale*100)}%)")
 
     def _set_scale(self, scale: float):
