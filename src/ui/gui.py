@@ -265,7 +265,22 @@ def cmd_gui(args: argparse.Namespace) -> None:
             try:
                 self.inner, self.kmaster, _ = unlock(self.repo, pw)
             except Exception as e:
-                QtWidgets.QMessageBox.critical(self, "Unlock failed", str(e))
+                # Check if this is a wrong password error (InvalidTag from AESGCM)
+                error_str = str(e)
+                if "InvalidTag" in str(type(e)) or "InvalidTag" in error_str:
+                    msg_box = QtWidgets.QMessageBox(self)
+                    msg_box.setIcon(QtWidgets.QMessageBox.Icon.Critical)
+                    msg_box.setWindowTitle("Wrong Password")
+                    msg_box.setText("Authentication failed - incorrect password")
+                    msg_box.setInformativeText(
+                        "The password you entered is incorrect.\n\n"
+                        "Please verify your master password and try again.\n\n"
+                        "Note: Passwords are case-sensitive."
+                    )
+                    msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+                    msg_box.exec()
+                else:
+                    QtWidgets.QMessageBox.critical(self, "Unlock failed", str(e))
                 return
             self.populate()
             self.save_btn.setEnabled(True)
