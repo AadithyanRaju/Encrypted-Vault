@@ -8,6 +8,8 @@ except Exception as e:
     sys.exit(1)
 
 class ImageViewer(QtWidgets.QDialog):
+    ZOOM_FACTOR = 1.15  # Zoom step factor for buttons and wheel
+    
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Image Viewer - {Path(image_path).name}")
@@ -72,8 +74,8 @@ class ImageViewer(QtWidgets.QDialog):
         layout.addWidget(close_btn)
 
         # Wire controls
-        self.zoom_in_btn.clicked.connect(lambda: self._zoom_by(1.15))
-        self.zoom_out_btn.clicked.connect(lambda: self._zoom_by(1.0/1.15))
+        self.zoom_in_btn.clicked.connect(lambda: self._zoom_by(self.ZOOM_FACTOR))
+        self.zoom_out_btn.clicked.connect(lambda: self._zoom_by(1.0/self.ZOOM_FACTOR))
         self.fit_btn.clicked.connect(self._fit_to_window)
         self.actual_btn.clicked.connect(self._actual_size)
         self.zoom_slider.valueChanged.connect(self._slider_changed)
@@ -91,7 +93,7 @@ class ImageViewer(QtWidgets.QDialog):
                 delta = event.angleDelta().y()
                 if delta == 0:
                     return False
-                factor = 1.15 if delta > 0 else (1.0/1.15)
+                factor = self.ZOOM_FACTOR if delta > 0 else (1.0/self.ZOOM_FACTOR)
                 self._zoom_by(factor)
                 event.accept()
                 return True
