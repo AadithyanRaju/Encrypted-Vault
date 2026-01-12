@@ -56,8 +56,16 @@ def cmd_gui(args: argparse.Namespace) -> None:
             # Give keyboard focus to the passphrase field by default
             self.pass_edit.setFocus()
 
-            # Selection controls
+            # Selection controls and search bar
             select_layout = QtWidgets.QHBoxLayout()
+            
+            # Search bar
+            self.search_edit = QtWidgets.QLineEdit()
+            self.search_edit.setPlaceholderText("Search files...")
+            self.search_edit.textChanged.connect(self.filter_files)
+            self.search_edit.setEnabled(False)
+            select_layout.addWidget(self.search_edit)
+            
             self.select_all_btn = QtWidgets.QPushButton("Select All")
             self.select_all_btn.clicked.connect(self.select_all)
             self.select_all_btn.setEnabled(False)
@@ -270,6 +278,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             self.close_btn.setEnabled(True)
             self.select_all_btn.setEnabled(True)
             self.deselect_all_btn.setEnabled(True)
+            self.search_edit.setEnabled(True)
             # Hide passphrase UI and show lock button
             try:
                 self.pass_edit.setVisible(False)
@@ -315,6 +324,47 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 checkbox = QtWidgets.QCheckBox()
                 checkbox.setStyleSheet("margin-left:4px; margin-right:4px;")
                 self.tree.setItemWidget(leaf, 0, checkbox)
+
+        def filter_files(self):
+            """Filter tree items based on search text."""
+            search_text = self.search_edit.text().lower().strip()
+            
+            # If search is empty, show all items
+            if not search_text:
+                it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+                while it.value():
+                    item = it.value()
+                    item.setHidden(False)
+                    it += 1
+                return
+            
+            # First pass: mark all items as hidden
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                item.setHidden(True)
+                it += 1
+            
+            # Second pass: show matching files and their parent folders
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                # Check if this is a file (has an ID in column 1)
+                if item.text(1):  # This is a file
+                    # Get file name and relpath for matching
+                    file_name = item.text(2).lower()
+                    file_relpath = item.text(4).lower()
+                    
+                    # Check if search text matches name or relpath
+                    if search_text in file_name or search_text in file_relpath:
+                        # Show this file
+                        item.setHidden(False)
+                        # Show all parent folders
+                        parent = item.parent()
+                        while parent is not None:
+                            parent.setHidden(False)
+                            parent = parent.parent()
+                it += 1
 
         def __set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
             # Recursively set all descendant file checkboxes
@@ -734,6 +784,13 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     btn.setEnabled(False)
                 except Exception:
                     pass
+            
+            # Disable and clear search field
+            try:
+                self.search_edit.setEnabled(False)
+                self.search_edit.clear()
+            except Exception:
+                pass
 
             #QtWidgets.QMessageBox.information(self, "Closed", "Repository closed.")
 
@@ -765,6 +822,13 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     btn.setEnabled(False)
                 except Exception:
                     pass
+            
+            # Disable and clear search field
+            try:
+                self.search_edit.setEnabled(False)
+                self.search_edit.clear()
+            except Exception:
+                pass
 
             # Show passphrase UI again and hide lock button
             try:
