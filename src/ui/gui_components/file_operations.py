@@ -131,7 +131,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
             tasks = [(file_path, str(Path(folder_path.name) / rel_path)) for file_path, rel_path in files_to_add]
 
             # Thread pool equal to CPU cores
-            max_workers = max(1, (os.cpu_count() or 1))
+            max_workers = os.cpu_count() or 1
             completed = 0
 
             with ThreadPoolExecutor(max_workers=max_workers) as ex:
@@ -254,7 +254,7 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
             progress.setAutoClose(True)
 
             # Thread pool sized to CPU cores
-            max_workers = max(1, (os.cpu_count() or 1))
+            max_workers = os.cpu_count() or 1
             completed = 0
             success_ids = []
             failed = []  # (fid, error)
