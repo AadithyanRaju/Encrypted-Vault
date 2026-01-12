@@ -577,6 +577,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
             )
             
             if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+                progress = None
                 try:
                     # Unlock once to get inner, kmaster, and KDF params
                     inner, kmaster, kdf = unlock(self.repo, self.pass_edit.text())
@@ -619,6 +620,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
                     # If canceled, do not write partial metadata changes (blobs already written remain orphaned)
                     if progress.wasCanceled():
+                        progress.close()
                         QtWidgets.QMessageBox.information(self, "Canceled", "Folder add canceled. Some blobs may have been written.")
                     else:
                         # Merge entries and save vault once
@@ -633,6 +635,9 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     self.inner, self.kmaster, _ = unlock(self.repo, self.pass_edit.text())
                     self.populate()
 
+                    # Close progress dialog before showing result
+                    progress.close()
+
                     # Show results
                     success_count = len(success_entries)
                     if failed_files:
@@ -645,6 +650,8 @@ def cmd_gui(args: argparse.Namespace) -> None:
                         QtWidgets.QMessageBox.information(self, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
 
                 except Exception as e:
+                    if progress:
+                        progress.close()
                     QtWidgets.QMessageBox.critical(self, "Error", f"Failed to add folder: {str(e)}")
 
         def remove_files(self):
