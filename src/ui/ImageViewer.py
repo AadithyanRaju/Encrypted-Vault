@@ -10,7 +10,8 @@ except Exception as e:
 class ImageViewer(QtWidgets.QDialog):
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Image Viewer - {Path(image_path).name}")
+        self._filename = Path(image_path).name
+        self.setWindowTitle(f"Image Viewer - {self._filename}")
         self.resize(800, 600)
         self._pixmap_orig = None
         self._scale = 1.0
@@ -114,7 +115,7 @@ class ImageViewer(QtWidgets.QDialog):
                 self.zoom_slider.setValue(max(self.zoom_slider.minimum(), min(self.zoom_slider.maximum(), val)))
             finally:
                 self.zoom_slider.blockSignals(bs)
-        self.setWindowTitle(f"Image Viewer - {self.windowTitle().split(' - ')[-1].split(' (')[0]} ({int(self._scale*100)}%)")
+        self.setWindowTitle(f"Image Viewer - {self._filename} ({int(self._scale*100)}%)")
 
     def _set_scale(self, scale: float):
         ns = max(self._min_scale, min(self._max_scale, scale))
