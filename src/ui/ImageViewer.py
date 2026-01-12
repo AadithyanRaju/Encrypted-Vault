@@ -12,7 +12,8 @@ class ImageViewer(QtWidgets.QDialog):
     
     def __init__(self, image_path: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Image Viewer - {Path(image_path).name}")
+        self._filename = Path(image_path).name
+        self.setWindowTitle(f"Image Viewer - {self._filename}")
         self.resize(800, 600)
         self._pixmap_orig = None
         self._scale = 1.0
