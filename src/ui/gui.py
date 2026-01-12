@@ -4,6 +4,7 @@ import mimetypes
 import os
 
 from pathlib import Path
+from cryptography.exceptions import InvalidTag
 
 from ui.AudioPlayer import AudioPlayer
 from ui.VideoPlayer import VideoPlayer
@@ -266,7 +267,6 @@ def cmd_gui(args: argparse.Namespace) -> None:
                 self.inner, self.kmaster, _ = unlock(self.repo, pw)
             except Exception as e:
                 # Check if this is a wrong password error (InvalidTag from AESGCM)
-                from cryptography.exceptions import InvalidTag
                 if isinstance(e, InvalidTag):
                     msg_box = QtWidgets.QMessageBox(self)
                     msg_box.setIcon(QtWidgets.QMessageBox.Icon.Critical)
