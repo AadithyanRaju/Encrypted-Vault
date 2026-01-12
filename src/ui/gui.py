@@ -338,12 +338,12 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     it += 1
                 return
             
-            # Single pass: collect matching files and build set of items to show
+            # First pass: collect matching files and their parent folders
             items_to_show = set()
             it = QtWidgets.QTreeWidgetItemIterator(self.tree)
             while it.value():
                 item = it.value()
-                # Check if this is a file (has file ID in column 1)
+                # Files have an ID in column 1, folders have empty string
                 if item.text(1):  # This is a file
                     # Get file name and relpath for matching
                     file_name = item.text(2).lower()
@@ -359,7 +359,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
                             parent = parent.parent()
                 it += 1
             
-            # Second pass: show/hide based on the collected set
+            # Second pass: show/hide all items based on the collected set
             it = QtWidgets.QTreeWidgetItemIterator(self.tree)
             while it.value():
                 item = it.value()
