@@ -338,18 +338,12 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     it += 1
                 return
             
-            # First pass: mark all items as hidden
+            # Single pass: collect matching files and build set of items to show
+            items_to_show = set()
             it = QtWidgets.QTreeWidgetItemIterator(self.tree)
             while it.value():
                 item = it.value()
-                item.setHidden(True)
-                it += 1
-            
-            # Second pass: show matching files and their parent folders
-            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
-            while it.value():
-                item = it.value()
-                # Check if this is a file (has an ID in column 1)
+                # Check if this is a file (has file ID in column 1)
                 if item.text(1):  # This is a file
                     # Get file name and relpath for matching
                     file_name = item.text(2).lower()
@@ -357,13 +351,19 @@ def cmd_gui(args: argparse.Namespace) -> None:
                     
                     # Check if search text matches name or relpath
                     if search_text in file_name or search_text in file_relpath:
-                        # Show this file
-                        item.setHidden(False)
-                        # Show all parent folders
+                        # Mark this file and all parent folders to be shown
+                        items_to_show.add(item)
                         parent = item.parent()
                         while parent is not None:
-                            parent.setHidden(False)
+                            items_to_show.add(parent)
                             parent = parent.parent()
+                it += 1
+            
+            # Second pass: show/hide based on the collected set
+            it = QtWidgets.QTreeWidgetItemIterator(self.tree)
+            while it.value():
+                item = it.value()
+                item.setHidden(item not in items_to_show)
                 it += 1
 
         def __set_descendants_checked(self, item: 'QtWidgets.QTreeWidgetItem', checked: bool) -> None:
