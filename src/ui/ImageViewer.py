@@ -139,11 +139,11 @@ class ImageViewer(QtWidgets.QDialog):
     def _fit_to_window(self):
         if self._pixmap_orig is None:
             return
-        vp = self.scroll_area.viewport().size()
+        viewport_size = self.scroll_area.viewport().size()
         if self._pixmap_orig.width() == 0 or self._pixmap_orig.height() == 0:
             return
-        scale_x = vp.width() / self._pixmap_orig.width()
-        scale_y = vp.height() / self._pixmap_orig.height()
+        scale_x = viewport_size.width() / self._pixmap_orig.width()
+        scale_y = viewport_size.height() / self._pixmap_orig.height()
         self._set_scale(max(self._min_scale, min(self._max_scale, min(scale_x, scale_y))))
 
     def _actual_size(self):
