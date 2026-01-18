@@ -15,7 +15,10 @@ class AudioPlayer(QtWidgets.QDialog):
         self.resize(800, 100)
         self.audio_path = audio_path
         if not Path(self.audio_path).exists():
-            QtWidgets.QMessageBox.critical(self, "Error", f"File not found:\n{self.audio_path}")
+            # Log error to console instead of showing popup
+            print(f"Error: File not found: {self.audio_path}")
+            # Close the dialog immediately
+            self.close()
             return
 
         # Player and audio output

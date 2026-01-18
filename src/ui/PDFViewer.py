@@ -127,9 +127,10 @@ class PDFViewer(QtWidgets.QDialog):
             else:  # Linux
                 subprocess.run(["xdg-open", pdf_path])
                 
-            QtWidgets.QMessageBox.information(self, "Success", "PDF opened with default application")
+            # Don't show popup - the file will open in default app
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to open PDF: {str(e)}")
+            # Show error in console since this is a fallback viewer
+            print(f"Failed to open PDF: {str(e)}")
     
     def on_load_finished(self, success):
         """Handle when PDF load is finished."""

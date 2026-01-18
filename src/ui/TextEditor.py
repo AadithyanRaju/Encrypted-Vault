@@ -23,6 +23,14 @@ class TextEditor(QtWidgets.QDialog):
         self.text_edit.setFont(QtGui.QFont("Consolas", 10))
         layout.addWidget(self.text_edit)
         
+        # Status message area
+        self.status_label = QtWidgets.QLabel("")
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 4px;")
+        self.status_label.setMinimumHeight(30)
+        self.status_label.setVisible(False)
+        layout.addWidget(self.status_label)
+        
         # Load file content
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -55,6 +63,40 @@ class TextEditor(QtWidgets.QDialog):
         self.file_path = file_path
         self.original_content = self.text_edit.toPlainText()
     
+    def show_message(self, message: str, message_type: str = "info"):
+        """Display a message in the status area.
+        
+        Args:
+            message: The message to display
+            message_type: Type of message - "info", "warning", "error", "success"
+        """
+        colors = {
+            "info": "#e3f2fd",      # Light blue
+            "warning": "#fff3e0",   # Light orange
+            "error": "#ffebee",     # Light red
+            "success": "#e8f5e9"    # Light green
+        }
+        border_colors = {
+            "info": "#2196F3",      # Blue
+            "warning": "#FF9800",   # Orange
+            "error": "#F44336",     # Red
+            "success": "#4CAF50"    # Green
+        }
+        
+        bg_color = colors.get(message_type, colors["info"])
+        border_color = border_colors.get(message_type, border_colors["info"])
+        
+        self.status_label.setText(message)
+        self.status_label.setStyleSheet(
+            f"padding: 8px; border: 2px solid {border_color}; "
+            f"background-color: {bg_color}; border-radius: 4px;"
+        )
+        self.status_label.setVisible(True)
+        
+        # Auto-hide success and info messages after 5 seconds
+        if message_type in ["info", "success"]:
+            QtCore.QTimer.singleShot(5000, lambda: self.status_label.setVisible(False))
+    
     def save_file(self):
         try:
             content = self.text_edit.toPlainText()
@@ -64,9 +106,9 @@ class TextEditor(QtWidgets.QDialog):
             # Emit signal to notify parent about the save
             self.file_saved.emit(self.file_path, content)
             
-            QtWidgets.QMessageBox.information(self, "Success", "File saved successfully!")
+            self.show_message("File saved successfully", "success")
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+            self.show_message(f"Failed to save file: {str(e)}", "error")
     
     def closeEvent(self, event):
         # Check if content has changed
