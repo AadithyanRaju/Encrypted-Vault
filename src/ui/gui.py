@@ -17,20 +17,7 @@ from ui.gui_components.vault_operations import (
     unlock_vault, lock_vault, close_repository,
     change_master_password, save_text_file_to_vault
 )
-
-# Status message styling constants
-MESSAGE_COLORS = {
-    "info": "#e3f2fd",      # Light blue
-    "warning": "#fff3e0",   # Light orange
-    "error": "#ffebee",     # Light red
-    "success": "#e8f5e9"    # Light green
-}
-MESSAGE_BORDER_COLORS = {
-    "info": "#2196F3",      # Blue
-    "warning": "#FF9800",   # Orange
-    "error": "#F44336",     # Red
-    "success": "#4CAF50"    # Green
-}
+from ui.constants import MESSAGE_COLORS, MESSAGE_BORDER_COLORS
 
 def cmd_gui(args: argparse.Namespace) -> None:
     try:

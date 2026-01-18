@@ -7,19 +7,7 @@ except Exception as e:
     print("[!] PyQt6 not installed. pip install PyQt6")
     sys.exit(1)
 
-# Status message styling constants
-MESSAGE_COLORS = {
-    "info": "#e3f2fd",      # Light blue
-    "warning": "#fff3e0",   # Light orange
-    "error": "#ffebee",     # Light red
-    "success": "#e8f5e9"    # Light green
-}
-MESSAGE_BORDER_COLORS = {
-    "info": "#2196F3",      # Blue
-    "warning": "#FF9800",   # Orange
-    "error": "#F44336",     # Red
-    "success": "#4CAF50"    # Green
-}
+from ui.constants import MESSAGE_COLORS, MESSAGE_BORDER_COLORS
 
 class TextEditor(QtWidgets.QDialog):
     # Signal to notify when file is saved
