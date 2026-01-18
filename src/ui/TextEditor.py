@@ -7,6 +7,20 @@ except Exception as e:
     print("[!] PyQt6 not installed. pip install PyQt6")
     sys.exit(1)
 
+# Status message styling constants
+MESSAGE_COLORS = {
+    "info": "#e3f2fd",      # Light blue
+    "warning": "#fff3e0",   # Light orange
+    "error": "#ffebee",     # Light red
+    "success": "#e8f5e9"    # Light green
+}
+MESSAGE_BORDER_COLORS = {
+    "info": "#2196F3",      # Blue
+    "warning": "#FF9800",   # Orange
+    "error": "#F44336",     # Red
+    "success": "#4CAF50"    # Green
+}
+
 class TextEditor(QtWidgets.QDialog):
     # Signal to notify when file is saved
     file_saved = QtCore.pyqtSignal(str, str)  # file_path, content
@@ -70,21 +84,8 @@ class TextEditor(QtWidgets.QDialog):
             message: The message to display
             message_type: Type of message - "info", "warning", "error", "success"
         """
-        colors = {
-            "info": "#e3f2fd",      # Light blue
-            "warning": "#fff3e0",   # Light orange
-            "error": "#ffebee",     # Light red
-            "success": "#e8f5e9"    # Light green
-        }
-        border_colors = {
-            "info": "#2196F3",      # Blue
-            "warning": "#FF9800",   # Orange
-            "error": "#F44336",     # Red
-            "success": "#4CAF50"    # Green
-        }
-        
-        bg_color = colors.get(message_type, colors["info"])
-        border_color = border_colors.get(message_type, border_colors["info"])
+        bg_color = MESSAGE_COLORS.get(message_type, MESSAGE_COLORS["info"])
+        border_color = MESSAGE_BORDER_COLORS.get(message_type, MESSAGE_BORDER_COLORS["info"])
         
         self.status_label.setText(message)
         self.status_label.setStyleSheet(
