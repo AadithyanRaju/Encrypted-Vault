@@ -7,7 +7,7 @@ except Exception as e:
     print("[!] PyQt6 not installed. pip install PyQt6")
     sys.exit(1)
 
-from ui.constants import MESSAGE_COLORS, MESSAGE_BORDER_COLORS
+from ui.constants import MESSAGE_COLORS, MESSAGE_BORDER_COLORS, MESSAGE_TEXT_COLORS
 
 class TextEditor(QtWidgets.QDialog):
     # Signal to notify when file is saved
@@ -74,11 +74,13 @@ class TextEditor(QtWidgets.QDialog):
         """
         bg_color = MESSAGE_COLORS.get(message_type, MESSAGE_COLORS["info"])
         border_color = MESSAGE_BORDER_COLORS.get(message_type, MESSAGE_BORDER_COLORS["info"])
+        text_color = MESSAGE_TEXT_COLORS.get(message_type, MESSAGE_TEXT_COLORS["info"])
         
         self.status_label.setText(message)
         self.status_label.setStyleSheet(
             f"padding: 8px; border: 2px solid {border_color}; "
-            f"background-color: {bg_color}; border-radius: 4px;"
+            f"background-color: {bg_color}; color: {text_color}; "
+            f"border-radius: 4px; font-weight: bold;"
         )
         self.status_label.setVisible(True)
         

@@ -14,3 +14,10 @@ MESSAGE_BORDER_COLORS = {
     "error": "#F44336",     # Red
     "success": "#4CAF50"    # Green
 }
+
+MESSAGE_TEXT_COLORS = {
+    "info": "#0d47a1",      # Dark blue
+    "warning": "#e65100",   # Dark orange
+    "error": "#b71c1c",     # Dark red
+    "success": "#1b5e20"    # Dark green
+}
