@@ -36,7 +36,7 @@ def add_single_file(parent_window, repo, passphrase, populate_callback):
         tuple: (inner_metadata, kmaster) on success, (None, None) on failure
     """
     if not repo:
-        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
+        parent_window.show_message("Please select a repository first", "warning")
         return None, None
         
     dlg = QtWidgets.QFileDialog(parent_window)
@@ -55,10 +55,10 @@ def add_single_file(parent_window, repo, passphrase, populate_callback):
         inner, kmaster, _ = unlock(repo, passphrase)
         populate_callback()
         
-        QtWidgets.QMessageBox.information(parent_window, "Success", f"Added {Path(file_path).name} to vault")
+        parent_window.show_message(f"Added {Path(file_path).name} to vault", "success")
         return inner, kmaster
     except Exception as e:
-        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to add file: {str(e)}")
+        parent_window.show_message(f"Failed to add file: {str(e)}", "error")
         return None, None
 
 
@@ -75,7 +75,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
         tuple: (inner_metadata, kmaster) on success, (None, None) on failure
     """
     if not repo:
-        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
+        parent_window.show_message("Please select a repository first", "warning")
         return None, None
         
     dlg = QtWidgets.QFileDialog(parent_window)
@@ -85,7 +85,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
     
     folder_path = Path(folder_path)
     if not folder_path.is_dir():
-        QtWidgets.QMessageBox.warning(parent_window, "Invalid Selection", "Please select a valid folder")
+        parent_window.show_message("Please select a valid folder", "warning")
         return None, None
     
     # Get all files in the folder recursively
@@ -97,7 +97,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
             files_to_add.append((file_path, rel_path))
     
     if not files_to_add:
-        QtWidgets.QMessageBox.information(parent_window, "Empty Folder", "The selected folder contains no files")
+        parent_window.show_message("The selected folder contains no files", "info")
         return None, None
     
     # Confirm with user
@@ -157,7 +157,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
             if progress.wasCanceled():
                 progress.close()
                 progress = None
-                QtWidgets.QMessageBox.information(parent_window, "Canceled", "Folder add canceled. Some blobs may have been written.")
+                parent_window.show_message("Folder add canceled. Some blobs may have been written.", "info")
                 return None, None
             else:
                 # Merge entries and save vault once
@@ -179,13 +179,13 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
                 # Show results
                 success_count = len(success_entries)
                 if failed_files:
-                    error_msg = f"Successfully added {success_count} files.\n\nFailed to add {len(failed_files)} files:\n"
+                    error_msg = f"Successfully added {success_count} files. Failed to add {len(failed_files)} files:\n"
                     error_msg += "\n".join([f"• {name}: {error}" for name, error in failed_files[:5]])
                     if len(failed_files) > 5:
                         error_msg += f"\n... and {len(failed_files) - 5} more failures"
-                    QtWidgets.QMessageBox.warning(parent_window, "Partial Success", error_msg)
+                    parent_window.show_message(error_msg, "warning")
                 else:
-                    QtWidgets.QMessageBox.information(parent_window, "Success", f"Added {success_count} files from '{folder_path.name}' to vault")
+                    parent_window.show_message(f"Added {success_count} files from '{folder_path.name}' to vault", "success")
                 
                 return inner, kmaster
 
@@ -193,7 +193,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
             if progress:
                 progress.close()
                 progress = None
-            QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to add folder: {str(e)}")
+            parent_window.show_message(f"Failed to add folder: {str(e)}", "error")
             return None, None
     
     return None, None
@@ -213,11 +213,11 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
         tuple: (inner_metadata, kmaster) on success, (None, None) on failure
     """
     if not repo:
-        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
+        parent_window.show_message("Please select a repository first", "warning")
         return None, None
         
     if not selected_files:
-        QtWidgets.QMessageBox.warning(parent_window, "No Selection", "Please select files to remove")
+        parent_window.show_message("Please select files to remove", "warning")
         return None, None
     
     # Confirm deletion
@@ -245,7 +245,7 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
                     targets.append((fid, blob_path))
 
             if not targets:
-                QtWidgets.QMessageBox.warning(parent_window, "No Matches", "Selected items not found in vault metadata")
+                parent_window.show_message("Selected items not found in vault metadata", "warning")
                 return None, None
 
             # Progress dialog
@@ -300,20 +300,20 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
 
             # Report outcome
             if failed:
-                msg = f"Removed {len(success_ids)} file(s).\n\nFailed to remove {len(failed)}:"
+                msg = f"Removed {len(success_ids)} file(s). Failed to remove {len(failed)}:"
                 # show up to 5 failures
                 for fid, err in failed[:5]:
                     name = id_to_entry.get(fid, {}).get("name", fid)
                     msg += f"\n• {name}: {err}"
                 if len(failed) > 5:
                     msg += f"\n... and {len(failed) - 5} more"
-                QtWidgets.QMessageBox.warning(parent_window, "Partial Success", msg)
+                parent_window.show_message(msg, "warning")
             else:
-                QtWidgets.QMessageBox.information(parent_window, "Success", f"Removed {len(success_ids)} file(s) from vault")
+                parent_window.show_message(f"Removed {len(success_ids)} file(s) from vault", "success")
             
             return inner, kmaster
         except Exception as e:
-            QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to remove files: {str(e)}")
+            parent_window.show_message(f"Failed to remove files: {str(e)}", "error")
             return None, None
     
     return None, None
@@ -331,15 +331,15 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
         on_text_file_saved_callback: Callback for when text file is saved
     """
     if not repo:
-        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
+        parent_window.show_message("Please select a repository first", "warning")
         return
         
     if not selected_files:
-        QtWidgets.QMessageBox.warning(parent_window, "No Selection", "Please select a file to open")
+        parent_window.show_message("Please select a file to open", "warning")
         return
     
     if len(selected_files) > 1:
-        QtWidgets.QMessageBox.warning(parent_window, "Multiple Selection", "Please select only one file to open")
+        parent_window.show_message("Please select only one file to open", "warning")
         return
     
     fid, name, relpath = selected_files[0]
@@ -386,7 +386,7 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
             editor.exec()
             
     except Exception as e:
-        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to open file: {str(e)}")
+        parent_window.show_message(f"Failed to open file: {str(e)}", "error")
     finally:
         # Clean up temporary file
         try:
@@ -406,11 +406,11 @@ def extract_selected_files(parent_window, repo, passphrase, selected_files):
         selected_files: List of (file_id, name, relpath) tuples
     """
     if not repo:
-        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
+        parent_window.show_message("Please select a repository first", "warning")
         return
         
     if not selected_files:
-        QtWidgets.QMessageBox.warning(parent_window, "No Selection", "Please select files to extract")
+        parent_window.show_message("Please select files to extract", "warning")
         return
     
     if len(selected_files) == 1:
@@ -424,9 +424,9 @@ def extract_selected_files(parent_window, repo, passphrase, selected_files):
         try:
             args = argparse.Namespace(repo=str(repo), id=fid, out=out, passphrase=passphrase)
             cmd_extract(args)
-            QtWidgets.QMessageBox.information(parent_window, "Done", f"Saved to {out}")
+            parent_window.show_message(f"Saved to {out}", "success")
         except Exception as e:
-            QtWidgets.QMessageBox.critical(parent_window, "Error", str(e))
+            parent_window.show_message(str(e), "error")
     else:
         # Multiple files - use directory dialog
         dlg = QtWidgets.QFileDialog(parent_window)
@@ -444,6 +444,6 @@ def extract_selected_files(parent_window, repo, passphrase, selected_files):
                 cmd_extract(args)
                 success_count += 1
             
-            QtWidgets.QMessageBox.information(parent_window, "Done", f"Extracted {success_count} files to {out_dir}")
+            parent_window.show_message(f"Extracted {success_count} files to {out_dir}", "success")
         except Exception as e:
-            QtWidgets.QMessageBox.critical(parent_window, "Error", str(e))
+            parent_window.show_message(str(e), "error")

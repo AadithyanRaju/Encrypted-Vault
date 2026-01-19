@@ -17,6 +17,7 @@ from ui.gui_components.vault_operations import (
     unlock_vault, lock_vault, close_repository,
     change_master_password, save_text_file_to_vault
 )
+from ui.constants import MESSAGE_COLORS, MESSAGE_BORDER_COLORS, MESSAGE_TEXT_COLORS
 
 def cmd_gui(args: argparse.Namespace) -> None:
     try:
@@ -136,11 +137,42 @@ def cmd_gui(args: argparse.Namespace) -> None:
             
             layout.addLayout(btn_row)
 
+            # Status message area at the bottom
+            self.status_label = QtWidgets.QLabel("")
+            self.status_label.setWordWrap(True)
+            self.status_label.setStyleSheet("padding: 8px; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 4px;")
+            self.status_label.setMinimumHeight(40)
+            self.status_label.setVisible(False)
+            layout.addWidget(self.status_label)
+
             self.inner = None
             self.kmaster = None
             self.current_editor = None
             self.current_file_id = None
             self._last_clicked_item = None      # track last clicked item to support Shift+click range selection
+
+        def show_message(self, message: str, message_type: str = "info"):
+            """Display a message in the status area.
+            
+            Args:
+                message: The message to display
+                message_type: Type of message - "info", "warning", "error", "success"
+            """
+            bg_color = MESSAGE_COLORS.get(message_type, MESSAGE_COLORS["info"])
+            border_color = MESSAGE_BORDER_COLORS.get(message_type, MESSAGE_BORDER_COLORS["info"])
+            text_color = MESSAGE_TEXT_COLORS.get(message_type, MESSAGE_TEXT_COLORS["info"])
+            
+            self.status_label.setText(message)
+            self.status_label.setStyleSheet(
+                f"padding: 8px; border: 2px solid {border_color}; "
+                f"background-color: {bg_color}; color: {text_color}; "
+                f"border-radius: 4px; font-weight: bold;"
+            )
+            self.status_label.setVisible(True)
+            
+            # Auto-hide success and info messages after 5 seconds
+            if message_type in ["info", "success"]:
+                QtCore.QTimer.singleShot(5000, lambda: self.status_label.setVisible(False))
 
         def show_startup_dialog(self):
             """Show dialog to create new repo or select existing one."""
@@ -148,7 +180,7 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
         def unlock(self):
             if not self.repo:
-                QtWidgets.QMessageBox.warning(self, "No Repository", "Please select a repository first")
+                self.show_message("Please select a repository first", "warning")
                 return
             
             pw = self.pass_edit.text()
