@@ -25,7 +25,7 @@ def unlock_vault(parent_window, repo, passphrase, populate_callback):
         tuple: (inner_metadata, kmaster) on success, (None, None) on failure
     """
     if not passphrase:
-        parent_window.show_message("Please enter a passphrase", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "Empty Passphrase", "Please enter a passphrase")
         return None, None
     
     try:
@@ -52,14 +52,13 @@ def unlock_vault(parent_window, repo, passphrase, populate_callback):
         parent_window.search_edit.setEnabled(True)
         
         populate_callback()
-        parent_window.show_message("Vault unlocked successfully", "success")
         return inner, kmaster
         
     except InvalidTag:
-        parent_window.show_message("Invalid passphrase or corrupted vault", "error")
+        QtWidgets.QMessageBox.critical(parent_window, "Authentication Failed", "Invalid passphrase or corrupted vault")
         return None, None
     except Exception as e:
-        parent_window.show_message(f"Failed to unlock vault: {str(e)}", "error")
+        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to unlock vault: {str(e)}")
         return None, None
 
 
@@ -187,10 +186,10 @@ def change_master_password(parent_window, repo, current_password, new_password, 
         # Update UI to use new password and re-unlock
         parent_window.pass_edit.setText(new_password)
         unlock_callback()
-        parent_window.show_message("Master password changed successfully", "success")
+        QtWidgets.QMessageBox.information(parent_window, "Success", "Master password changed.")
         return True
     except Exception as e:
-        parent_window.show_message(f"Failed to change password: {str(e)}", "error")
+        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to change password: {str(e)}")
         return False
 
 
@@ -216,8 +215,8 @@ def save_text_file_to_vault(parent_window, repo, file_id, content, passphrase, p
         inner, kmaster, _ = unlock(repo, passphrase)
         populate_callback()
         
-        parent_window.show_message("File updated in vault successfully", "success")
+        QtWidgets.QMessageBox.information(parent_window, "Success", "File updated in vault successfully!")
         return inner, kmaster
     except Exception as e:
-        parent_window.show_message(f"Failed to update file in vault: {str(e)}", "error")
+        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to update file in vault: {str(e)}")
         return None, None

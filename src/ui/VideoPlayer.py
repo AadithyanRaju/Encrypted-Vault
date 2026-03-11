@@ -159,8 +159,7 @@ class VideoPlayer(QtWidgets.QDialog):
         return super().closeEvent(event)
 
     def _on_media_error(self, err, err_str):
-        # Log error to console instead of showing popup
-        print(f"Player error: {err_str}")
+        QtWidgets.QMessageBox.warning(self, "Playback error", f"Player error: {err_str}\nFalling back to external player.")
         try:
             import os
             os.startfile(self._temp_copy_path)  # Windows: opens with default app (VLC if installed)

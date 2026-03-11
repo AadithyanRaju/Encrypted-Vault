@@ -93,7 +93,7 @@ def create_new_repo(parent_window, parent_dialog):
     confirm = confirm_edit.text()
     
     if not password or password != confirm:
-        parent_window.show_message("Passwords do not match or are empty", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "Error", "Passwords do not match or are empty")
         return
     
     try:
@@ -113,10 +113,10 @@ def create_new_repo(parent_window, parent_dialog):
         parent_window.show()
         parent_window.unlock()
         
-        parent_window.show_message(f"Created new repository at {repo_path}", "success")
+        QtWidgets.QMessageBox.information(parent_window, "Success", f"Created new repository at {repo_path}")
         
     except Exception as e:
-        parent_window.show_message(f"Failed to create repository: {str(e)}", "error")
+        QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to create repository: {str(e)}")
 
 
 def select_existing_repo(parent_window, parent_dialog):
@@ -135,7 +135,7 @@ def select_existing_repo(parent_window, parent_dialog):
     vault_file = repo_path / "vault.enc"
     
     if not vault_file.exists():
-        parent_window.show_message("Selected directory does not contain a vault.enc file", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "Invalid Repository", "Selected directory does not contain a vault.enc file")
         return
     
     # Set repo and show main window
@@ -154,7 +154,7 @@ def show_change_master_password_dialog(parent_window):
         tuple: (current_password, new_password, confirmed) or (None, None, False) if cancelled
     """
     if not parent_window.repo:
-        parent_window.show_message("Please select a repository first", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "No Repository", "Please select a repository first")
         return None, None, False
         
     dlg = QtWidgets.QDialog(parent_window)
@@ -193,10 +193,10 @@ def show_change_master_password_dialog(parent_window):
     conf = confirm_edit.text()
 
     if not curr or not newp:
-        parent_window.show_message("Please fill all fields", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "Missing", "Please fill all fields")
         return None, None, False
     if newp != conf:
-        parent_window.show_message("New passwords do not match", "warning")
+        QtWidgets.QMessageBox.warning(parent_window, "Mismatch", "New passwords do not match")
         return None, None, False
 
     return curr, newp, True
