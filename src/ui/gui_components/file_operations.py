@@ -406,31 +406,33 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
             cleanup = make_cleanup(temp_path, temp_dir)
 
             if mime_type and mime_type.startswith('image/'):
-                viewer = ImageViewer(temp_path, parent_window)
+                # Use None as parent so the viewer is an independent top-level window
+                # and does not obscure the main file listing window.
+                viewer = ImageViewer(temp_path, None)
                 parent_window._open_viewers.append(viewer)
                 viewer.finished.connect(cleanup)
                 viewer.finished.connect(make_remove_viewer(viewer))
                 viewer.show()
             elif mime_type == 'application/pdf':
-                viewer = PDFViewer(temp_path, parent_window)
+                viewer = PDFViewer(temp_path, None)
                 parent_window._open_viewers.append(viewer)
                 viewer.finished.connect(cleanup)
                 viewer.finished.connect(make_remove_viewer(viewer))
                 viewer.show()
             elif mime_type and mime_type.startswith('video/'):
-                player = VideoPlayer(temp_path, parent_window)
+                player = VideoPlayer(temp_path, None)
                 parent_window._open_viewers.append(player)
                 player.finished.connect(cleanup)
                 player.finished.connect(make_remove_viewer(player))
                 player.show()
             elif mime_type and mime_type.startswith('audio/'):
-                player = AudioPlayer(temp_path, parent_window)
+                player = AudioPlayer(temp_path, None)
                 parent_window._open_viewers.append(player)
                 player.finished.connect(cleanup)
                 player.finished.connect(make_remove_viewer(player))
                 player.show()
             else:
-                editor = TextEditor(temp_path, parent_window)
+                editor = TextEditor(temp_path, None)
                 parent_window._open_viewers.append(editor)
                 # Per-file save callback: set the correct file ID before saving
                 def make_text_save_callback(captured_fid):
