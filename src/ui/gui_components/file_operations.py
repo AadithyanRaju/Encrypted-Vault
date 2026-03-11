@@ -320,8 +320,11 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
 
 
 def open_file_viewer(parent_window, repo, passphrase, selected_files, current_file_id_setter, on_text_file_saved_callback):
-    """Open a file viewer for the selected file.
-    
+    """Open file viewers for the selected files using parallel extraction.
+
+    Multiple files are extracted concurrently via a thread pool and each
+    viewer is opened as a non-modal window so all can be used simultaneously.
+
     Args:
         parent_window: Parent window for dialogs
         repo: Repository path
@@ -333,7 +336,7 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
     if not repo:
         parent_window.show_message("Please select a repository first", "warning")
         return
-        
+
     if not selected_files:
         parent_window.show_message("Please select a file to open", "warning")
         return
@@ -353,47 +356,118 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
     
     try:
         # Extract file to temp location
+
+    # Extract a single file to a temp location (runs in a worker thread)
+    def extract_to_temp(fid_name_relpath):
+        fid, name, relpath = fid_name_relpath
+        temp_dir = tempfile.mkdtemp()
+        temp_path = os.path.join(temp_dir, name)
         extract_args = argparse.Namespace(
-            repo=str(repo), 
-            id=fid, 
-            out=temp_path, 
+            repo=str(repo),
+            id=fid,
+            out=temp_path,
             passphrase=passphrase
         )
         cmd_extract(extract_args)
-        
-        # Determine file type and open appropriate viewer
-        mime_type, _ = mimetypes.guess_type(name)
-        
-        if mime_type and mime_type.startswith('image/'):
-            # Open image viewer
-            viewer = ImageViewer(temp_path, parent_window)
-            viewer.exec()
-        elif mime_type == 'application/pdf':
-            # Open PDF viewer
-            viewer = PDFViewer(temp_path, parent_window)
-            viewer.exec()
-        elif mime_type and mime_type.startswith('video/'):
-            player = VideoPlayer(temp_path, parent_window)
-            player.exec()
-        elif mime_type and mime_type.startswith('audio/'):
-            player = AudioPlayer(temp_path, parent_window)
-            player.exec()
-        else:
-            # Open text editor for text files and unknown types
-            editor = TextEditor(temp_path, parent_window)
-            # Connect the save signal
-            editor.file_saved.connect(on_text_file_saved_callback)
-            editor.exec()
-            
-    except Exception as e:
-        parent_window.show_message(f"Failed to open file: {str(e)}", "error")
-    finally:
-        # Clean up temporary file
+        return fid, name, temp_dir, temp_path
+
+    # Extract all selected files in parallel
+    max_workers = min(len(selected_files), os.cpu_count() or 1)
+    extracted = []
+    failed = []
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        future_map = {ex.submit(extract_to_temp, item): item for item in selected_files}
+        for fut in as_completed(future_map):
+            item = future_map[fut]
+            try:
+                extracted.append(fut.result())
+            except Exception as e:
+                failed.append((item[1], str(e)))
+
+    if failed:
+        error_msg = f"Failed to open {len(failed)} file(s):\n" + "\n".join(
+            [f"• {n}: {e}" for n, e in failed[:5]]
+        )
+        if len(failed) > 5:
+            error_msg += f"\n... and {len(failed) - 5} more"
+        QtWidgets.QMessageBox.warning(parent_window, "Error Opening Files", error_msg)
+
+    # Keep viewer references on the parent window so they aren't garbage-collected
+    if not hasattr(parent_window, '_open_viewers'):
+        parent_window._open_viewers = []
+
+    # Open a non-modal viewer for each successfully extracted file
+    for fid, name, temp_dir, temp_path in extracted:
         try:
-            os.remove(temp_path)
-            os.rmdir(temp_dir)
-        except:
-            pass
+            mime_type, _ = mimetypes.guess_type(name)
+
+            # Build closures that capture the correct paths / viewer for cleanup
+            def make_cleanup(tp, td):
+                def cleanup():
+                    try:
+                        os.remove(tp)
+                        os.rmdir(td)
+                    except Exception:
+                        pass
+                return cleanup
+
+            def make_remove_viewer(v):
+                def remove():
+                    try:
+                        parent_window._open_viewers.remove(v)
+                    except ValueError:
+                        pass
+                return remove
+
+            cleanup = make_cleanup(temp_path, temp_dir)
+
+            if mime_type and mime_type.startswith('image/'):
+                # Use None as parent so the viewer is an independent top-level window
+                # and does not obscure the main file listing window.
+                viewer = ImageViewer(temp_path, None)
+                parent_window._open_viewers.append(viewer)
+                viewer.finished.connect(cleanup)
+                viewer.finished.connect(make_remove_viewer(viewer))
+                viewer.show()
+            elif mime_type == 'application/pdf':
+                viewer = PDFViewer(temp_path, None)
+                parent_window._open_viewers.append(viewer)
+                viewer.finished.connect(cleanup)
+                viewer.finished.connect(make_remove_viewer(viewer))
+                viewer.show()
+            elif mime_type and mime_type.startswith('video/'):
+                player = VideoPlayer(temp_path, None)
+                parent_window._open_viewers.append(player)
+                player.finished.connect(cleanup)
+                player.finished.connect(make_remove_viewer(player))
+                player.show()
+            elif mime_type and mime_type.startswith('audio/'):
+                player = AudioPlayer(temp_path, None)
+                parent_window._open_viewers.append(player)
+                player.finished.connect(cleanup)
+                player.finished.connect(make_remove_viewer(player))
+                player.show()
+            else:
+                editor = TextEditor(temp_path, None)
+                parent_window._open_viewers.append(editor)
+                # Per-file save callback: set the correct file ID before saving
+                def make_text_save_callback(captured_fid):
+                    def callback(file_path, content):
+                        current_file_id_setter(captured_fid)
+                        on_text_file_saved_callback(file_path, content)
+                    return callback
+                editor.file_saved.connect(make_text_save_callback(fid))
+                editor.finished.connect(cleanup)
+                editor.finished.connect(make_remove_viewer(editor))
+                editor.show()
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(parent_window, "Error", f"Failed to open {name}: {str(e)}")
+            try:
+                os.remove(temp_path)
+                os.rmdir(temp_dir)
+            except Exception:
+                pass
 
 
 def extract_selected_files(parent_window, repo, passphrase, selected_files):
