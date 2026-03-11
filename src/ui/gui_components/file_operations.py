@@ -353,9 +353,6 @@ def open_file_viewer(parent_window, repo, passphrase, selected_files, current_fi
     # Create temporary file for viewing
     temp_dir = tempfile.mkdtemp()
     temp_path = os.path.join(temp_dir, name)
-    
-    try:
-        # Extract file to temp location
 
     # Extract a single file to a temp location (runs in a worker thread)
     def extract_to_temp(fid_name_relpath):
