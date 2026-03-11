@@ -170,21 +170,8 @@ class ImageViewer(QtWidgets.QDialog):
         viewport_size = self.scroll_area.viewport().size()
         if self._pixmap_orig.width() == 0 or self._pixmap_orig.height() == 0:
             # Avoid division by zero and keep the viewer in a consistent state.
-            # Set a reasonable default scale and notify the user that the image is invalid.
-            try:
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Invalid image size",
-                    "Cannot fit image to window because it has zero width or height.\n"
-                    "Showing the image at 100% zoom instead."
-                )
-            except RuntimeError:
-                # If the message box cannot be shown (e.g., in headless environments),
-                # silently continue
-                pass
-            finally:
-                # Always set a valid scale regardless of whether the message box was shown
-                self._set_scale(1.0)
+            # Set a reasonable default scale without showing a popup
+            self._set_scale(1.0)
             return
         scale_x = viewport_size.width() / self._pixmap_orig.width()
         scale_y = viewport_size.height() / self._pixmap_orig.height()
