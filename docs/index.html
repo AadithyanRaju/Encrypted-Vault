@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Encrypted Vault — Documentation</title>
+  <meta name="description" content="Encrypted Vault: A secure, user-friendly file encryption tool with AES-256-GCM and Argon2id key derivation. Full documentation for GUI and CLI usage." />
+  <style>
+    /* ─── Reset & Variables ────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --bg-surface:  #161b22;
+      --bg-elevated: #21262d;
+      --border:      #30363d;
+      --accent:      #58a6ff;
+      --accent-2:    #3fb950;
+      --warning:     #d29922;
+      --danger:      #f85149;
+      --text:        #e6edf3;
+      --text-muted:  #8b949e;
+      --sidebar-w:   260px;
+      --header-h:    56px;
+      --radius:      8px;
+      --mono:        "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+      --sans:        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ─── Top Header ────────────────────────────────────────────── */
+    .site-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--header-h);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      gap: 1rem;
+      z-index: 100;
+    }
+
+    .site-header .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .site-header .logo svg {
+      flex-shrink: 0;
+    }
+
+    .site-header .badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+    }
+
+    .header-links {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-links a {
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.875rem;
+      transition: color 0.15s;
+    }
+
+    .header-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* hamburger */
+    .menu-toggle {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: var(--text-muted);
+    }
+
+    /* ─── Layout ────────────────────────────────────────────────── */
+    .layout {
+      display: flex;
+      padding-top: var(--header-h);
+      min-height: 100vh;
+    }
+
+    /* ─── Sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      position: fixed;
+      top: var(--header-h);
+      bottom: 0;
+      left: 0;
+      overflow-y: auto;
+      padding: 1.5rem 1rem 2rem;
+      border-right: 1px solid var(--border);
+      background: var(--bg-surface);
+      z-index: 90;
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .sidebar-group { margin-bottom: 1.5rem; }
+
+    .sidebar-group-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 0 0.5rem 0.5rem;
+    }
+
+    .sidebar nav ul { list-style: none; }
+
+    .sidebar nav ul li a {
+      display: block;
+      padding: 0.3rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar nav ul li a:hover,
+    .sidebar nav ul li a.active {
+      background: var(--bg-elevated);
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .sidebar nav ul li a.active { color: var(--accent); }
+
+    /* ─── Main Content ──────────────────────────────────────────── */
+    .content {
+      flex: 1;
+      min-width: 0;
+      margin-left: var(--sidebar-w);
+      padding: 3rem 3rem 5rem;
+      max-width: 900px;
+    }
+
+    /* ─── Hero ──────────────────────────────────────────────────── */
+    .hero {
+      padding: 2rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+
+    .hero-eyebrow {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #e6edf3 30%, #58a6ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      max-width: 620px;
+      line-height: 1.65;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .hero-badges .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      background: var(--bg-elevated);
+    }
+
+    .pill.green { border-color: #238636; color: var(--accent-2); }
+    .pill.blue  { border-color: #1f6feb; color: var(--accent); }
+    .pill.yellow { border-color: #9e6a03; color: var(--warning); }
+
+    /* ─── Sections ──────────────────────────────────────────────── */
+    section {
+      margin-bottom: 4rem;
+      scroll-margin-top: calc(var(--header-h) + 1.5rem);
+    }
+
+    section h2 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    section h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 1.75rem 0 0.75rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    section h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 1.25rem 0 0.5rem;
+      color: var(--text-muted);
+    }
+
+    p { margin-bottom: 0.9rem; color: var(--text-muted); }
+    p strong, li strong { color: var(--text); }
+
+    ul, ol {
+      padding-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    li { margin-bottom: 0.35rem; color: var(--text-muted); }
+
+    /* ─── Code Blocks ───────────────────────────────────────────── */
+    pre {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+      margin: 0.75rem 0 1.25rem;
+      position: relative;
+    }
+
+    pre code {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: #e6edf3;
+    }
+
+    /* Copy button */
+    pre .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.6rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+    }
+
+    pre:hover .copy-btn { opacity: 1; }
+    pre .copy-btn:hover { color: var(--text); }
+    pre .copy-btn.copied { color: var(--accent-2); }
+
+    code:not(pre code) {
+      font-family: var(--mono);
+      font-size: 0.82em;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #ffa657;
+    }
+
+    /* language tag */
+    pre[data-lang]::before {
+      content: attr(data-lang);
+      position: absolute;
+      top: 0.5rem;
+      left: 1rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    /* ─── Cards / Feature grid ──────────────────────────────────── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-top: 1.25rem;
+    }
+
+    .feature-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      transition: border-color 0.15s;
+    }
+
+    .feature-card:hover { border-color: var(--accent); }
+
+    .feature-card .icon {
+      font-size: 1.6rem;
+      margin-bottom: 0.6rem;
+      display: block;
+    }
+
+    .feature-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.4rem;
+    }
+
+    .feature-card p {
+      font-size: 0.83rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    /* ─── Step list ─────────────────────────────────────────────── */
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      align-items: flex-start;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #000;
+      font-weight: 700;
+      font-size: 0.8rem;
+      display: grid;
+      place-items: center;
+      margin-top: 0.15rem;
+    }
+
+    .steps li .step-body { flex: 1; }
+    .steps li .step-body strong { display: block; margin-bottom: 0.3rem; font-size: 0.95rem; }
+
+    /* ─── Tabs ──────────────────────────────────────────────────── */
+    .tabs { margin: 1rem 0; }
+
+    .tab-list {
+      display: flex;
+      gap: 0.25rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: -1px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      transition: color 0.15s, background 0.15s;
+      position: relative;
+      bottom: -1px;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+
+    .tab-btn.active {
+      background: var(--bg-elevated);
+      border-color: var(--border);
+      border-bottom-color: var(--bg-elevated);
+      color: var(--text);
+    }
+
+    .tab-panel {
+      display: none;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      padding: 1rem 1.25rem;
+    }
+
+    .tab-panel.active { display: block; }
+
+    .tab-panel pre {
+      border: none;
+      padding: 0;
+      margin: 0;
+      background: transparent;
+    }
+
+    /* ─── Callouts ──────────────────────────────────────────────── */
+    .callout {
+      border-left: 3px solid;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      background: var(--bg-elevated);
+    }
+
+    .callout.warning { border-color: var(--warning); }
+    .callout.danger  { border-color: var(--danger); }
+    .callout.info    { border-color: var(--accent); }
+    .callout.tip     { border-color: var(--accent-2); }
+
+    .callout-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    .callout.warning .callout-title { color: var(--warning); }
+    .callout.danger  .callout-title { color: var(--danger); }
+    .callout.info    .callout-title { color: var(--accent); }
+    .callout.tip     .callout-title { color: var(--accent-2); }
+
+    .callout p { margin: 0; font-size: 0.88rem; }
+
+    /* ─── Command Table ─────────────────────────────────────────── */
+    .cmd-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+
+    .cmd-table th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .cmd-table td {
+      padding: 0.65rem 1rem;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .cmd-table tr:hover td { background: var(--bg-elevated); }
+
+    .cmd-table td code {
+      font-size: 0.8rem;
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+    }
+
+    .cmd-table td:last-child { color: var(--text-muted); }
+
+    /* ─── Binary Format Table ────────────────────────────────────── */
+    .binary-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+    .binary-table th, .binary-table td { padding: 0.6rem 1rem; border: 1px solid var(--border); }
+    .binary-table th { background: var(--bg-elevated); color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; text-align: left; }
+    .binary-table tr:hover td { background: var(--bg-elevated); }
+    .binary-table .field { font-family: var(--mono); font-size: 0.82rem; color: #ffa657; }
+    .binary-table .bytes { font-family: var(--mono); font-size: 0.82rem; color: var(--accent); }
+    .binary-table td:last-child { color: var(--text-muted); font-size: 0.85rem; }
+
+    /* ─── Structure tree ────────────────────────────────────────── */
+    .dir-tree {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      overflow-x: auto;
+    }
+
+    .dir-tree .dir   { color: var(--accent); }
+    .dir-tree .file  { color: var(--text); }
+    .dir-tree .comment { color: var(--text-muted); }
+
+    /* ─── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .content {
+        margin-left: 0;
+        padding: 2rem 1.25rem 4rem;
+      }
+
+      .menu-toggle { display: flex; }
+
+      .hero h1 { font-size: 1.8rem; }
+
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Overlay for mobile sidebar ───────────────────────────── */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 80;
+    }
+
+    .sidebar-overlay.show { display: block; }
+
+    /* ─── Footer ────────────────────────────────────────────────── */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .site-footer a { color: var(--text-muted); }
+    .site-footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ─── Top Header ─────────────────────────────────────────────── -->
+<header class="site-header">
+  <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="3" y1="6"  x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    Encrypted Vault
+  </div>
+
+  <span class="badge">Docs</span>
+
+  <div class="header-links">
+    <a href="https://github.com/AadithyanRaju/Encrypted-Vault" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+      GitHub
+    </a>
+  </div>
+</header>
+
+<div class="sidebar-overlay" id="overlay"></div>
+
+<!-- ─── Layout ──────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <nav>
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Getting Started</div>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#prerequisites">Prerequisites</a></li>
+          <li><a href="#installation">Installation</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Usage</div>
+        <ul>
+          <li><a href="#gui-mode">GUI Mode</a></li>
+          <li><a href="#cli-mode">CLI Mode</a></li>
+          <li><a href="#cli-reference">CLI Reference</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Internals</div>
+        <ul>
+          <li><a href="#vault-structure">Vault Structure</a></li>
+          <li><a href="#binary-format">Binary Format</a></li>
+          <li><a href="#project-structure">Project Structure</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Security</div>
+        <ul>
+          <li><a href="#security">Security Details</a></li>
+          <li><a href="#best-practices">Best Practices</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">More</div>
+        <ul>
+          <li><a href="#building">Building Executable</a></li>
+          <li><a href="#contributing">Contributing</a></li>
+          <li><a href="#license">License</a></li>
+        </ul>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="content">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-eyebrow">Open Source · MIT License</div>
+      <h1>Encrypted Vault</h1>
+      <p>
+        A secure, user-friendly file encryption tool with both command-line and graphical
+        interfaces. Protect your sensitive files with military-grade encryption using
+        <strong>AES-256-GCM</strong> and <strong>Argon2id</strong> key derivation.
+      </p>
+      <div class="hero-badges">
+        <span class="pill green">✓ AES-256-GCM</span>
+        <span class="pill green">✓ Argon2id KDF</span>
+        <span class="pill blue">Python 3.8+</span>
+        <span class="pill blue">PyQt6 GUI</span>
+        <span class="pill yellow">MIT License</span>
+      </div>
+    </div>
+
+    <!-- Overview -->
+    <section id="overview">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Overview
+      </h2>
+      <p>
+        Encrypted Vault is a portable, GitHub-friendly encrypted file storage solution. Every
+        file you add is individually encrypted with a unique random 256-bit key. All metadata
+        is stored in an opaque binary format — no readable JSON or plain-text headers that
+        could expose sensitive information.
+      </p>
+      <p>
+        The application supports a full-featured graphical interface built with PyQt6 and a
+        powerful CLI for scripting and automation. Built-in viewers let you preview images,
+        PDFs, videos, audio, and text files directly from within the vault without writing
+        anything to disk.
+      </p>
+    </section>
+
+    <!-- Features -->
+    <section id="features">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Features
+      </h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <span class="icon">🔒</span>
+          <h3>Strong Encryption</h3>
+          <p>AES-256-GCM authenticated encryption with unique per-file random 256-bit keys. Prevents both eavesdropping and data tampering.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">🔑</span>
+          <h3>Secure Key Derivation</h3>
+          <p>Argon2id algorithm with SHA3-512 pre-hashing. Memory-hard and side-channel resistant. Configurable time/memory/parallelism parameters.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">🖥️</span>
+          <h3>Dual Interface</h3>
+          <p>Full-featured PyQt6 GUI with tree view, search, and drag-and-drop, plus a powerful CLI for scripting and automation pipelines.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">📦</span>
+          <h3>GitHub-Friendly</h3>
+          <p>All-binary vault format with opaque metadata. No readable headers that could leak filenames, sizes, or other sensitive information.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">📁</span>
+          <h3>Folder Support</h3>
+          <p>Add entire folder hierarchies and preserve directory structure using <code>--relpath</code>. Extract individual files or bulk-export everything.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">👁️</span>
+          <h3>Built-in Viewers</h3>
+          <p>Preview images, PDFs, videos, audio, and text files directly from the vault — no temporary unencrypted files written to disk.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">🔄</span>
+          <h3>Master Key Rotation</h3>
+          <p>Change your passphrase and Argon2 parameters at any time without re-encrypting individual files. Only the master key wrapper is updated.</p>
+        </div>
+        <div class="feature-card">
+          <span class="icon">📤</span>
+          <h3>Portable Executable</h3>
+          <p>Package as a standalone <code>.exe</code> using PyInstaller. Distribute to users who don't have Python installed.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Prerequisites -->
+    <section id="prerequisites">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Prerequisites
+      </h2>
+      <ul>
+        <li><strong>Python 3.8 or higher</strong> — <a href="https://www.python.org/downloads/" target="_blank" rel="noopener">Download Python</a></li>
+        <li><strong>pip</strong> — Python package manager (bundled with Python 3.4+)</li>
+        <li><strong>virtualenv</strong> (recommended) — for isolated environments</li>
+      </ul>
+
+      <h3>Dependencies</h3>
+      <table class="cmd-table">
+        <thead>
+          <tr><th>Package</th><th>Version</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>cryptography</code></td><td>≥ 41.0.0</td><td>AES-256-GCM encryption primitives</td></tr>
+          <tr><td><code>PyQt6</code></td><td>≥ 6.5.0</td><td>Desktop GUI framework</td></tr>
+          <tr><td><code>PyQt6-WebEngine</code></td><td>≥ 6.5.0</td><td>PDF viewing support in GUI</td></tr>
+          <tr><td><code>pycryptodome</code></td><td>≥ 3.18.0</td><td>Additional cryptographic utilities</td></tr>
+          <tr><td><code>argon2-cffi</code></td><td>≥ 25.1.0</td><td>Argon2id key derivation</td></tr>
+          <tr><td><code>Pillow</code></td><td>≥ 12.1.0</td><td>Image processing &amp; preview</td></tr>
+          <tr><td><code>pyinstaller</code></td><td>latest</td><td>Packaging standalone executables</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Installation -->
+    <section id="installation">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+        Installation
+      </h2>
+
+      <ol class="steps">
+        <li>
+          <div class="step-body">
+            <strong>Clone the repository</strong>
+            <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>git clone https://github.com/AadithyanRaju/Encrypted-Vault.git
+cd Encrypted-Vault</code></pre>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <strong>Create a virtual environment (recommended)</strong>
+            <div class="tabs">
+              <div class="tab-list">
+                <button class="tab-btn active" onclick="switchTab(this, 'install-linux')">Linux / macOS</button>
+                <button class="tab-btn" onclick="switchTab(this, 'install-win-ps')">Windows (PowerShell)</button>
+                <button class="tab-btn" onclick="switchTab(this, 'install-win-cmd')">Windows (CMD)</button>
+              </div>
+              <div class="tab-panel active" id="install-linux">
+                <pre><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python3 -m venv .venv
+source .venv/bin/activate</code></pre>
+              </div>
+              <div class="tab-panel" id="install-win-ps">
+                <pre><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python -m venv .venv
+.venv\Scripts\Activate.ps1</code></pre>
+              </div>
+              <div class="tab-panel" id="install-win-cmd">
+                <pre><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python -m venv .venv
+.venv\Scripts\activate.bat</code></pre>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <strong>Install dependencies</strong>
+            <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>pip install -r requirements.txt</code></pre>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- GUI Mode -->
+    <section id="gui-mode">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        GUI Mode
+      </h2>
+      <p>The graphical interface provides a full file-manager-like experience for your encrypted vault.</p>
+
+      <h3>Launch the GUI</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code># Open the GUI without specifying a vault
+python src/efs.py gui
+
+# Open the GUI with a vault pre-loaded
+python src/efs.py gui /path/to/vault</code></pre>
+
+      <h3>GUI Capabilities</h3>
+      <ul>
+        <li>🔓 <strong>Unlock / lock vault</strong> — enter your master passphrase to decrypt the metadata index</li>
+        <li>➕ <strong>Add files &amp; folders</strong> — drag-and-drop or use the file browser, with optional relative path</li>
+        <li>📂 <strong>Tree view with search</strong> — browse your encrypted files hierarchically and filter by name</li>
+        <li>👁️ <strong>In-vault preview</strong> — images, PDFs, videos, audio, and text without extracting to disk</li>
+        <li>💾 <strong>Extract files</strong> — save individual files or bulk-export the entire vault</li>
+        <li>✏️ <strong>Rename &amp; delete</strong> — manage files without decrypting them</li>
+        <li>🔑 <strong>Change master password</strong> — rotate your passphrase and optionally adjust Argon2 parameters</li>
+      </ul>
+    </section>
+
+    <!-- CLI Mode -->
+    <section id="cli-mode">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        CLI Mode
+      </h2>
+      <p>The command-line interface is designed for scripting, automation, and headless environments.</p>
+
+      <h3>Initialize a New Vault</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code># Default Argon2 parameters
+python src/efs.py init /path/to/vault --passphrase "your-secure-passphrase"
+
+# Custom Argon2 parameters for higher security
+python src/efs.py init /path/to/vault --passphrase "your-passphrase" -t 8 -m 524288 -p 4</code></pre>
+
+      <table class="cmd-table" style="margin-top:0.5rem;">
+        <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>-t</code></td><td>4</td><td>Argon2 time cost (iterations)</td></tr>
+          <tr><td><code>-m</code></td><td>262144 (256 MiB)</td><td>Argon2 memory cost in KiB</td></tr>
+          <tr><td><code>-p</code></td><td>2</td><td>Argon2 parallelism factor</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Add Files</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code># Add a single file
+python src/efs.py add /path/to/vault /path/to/file.txt --passphrase "your-passphrase"
+
+# Preserve the original folder path inside the vault
+python src/efs.py add /path/to/vault /path/to/file.txt \
+  --relpath "documents/file.txt" --passphrase "your-passphrase"</code></pre>
+
+      <h3>List Encrypted Files</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python src/efs.py ls /path/to/vault --passphrase "your-passphrase"</code></pre>
+
+      <h3>Extract Files</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python src/efs.py extract /path/to/vault &lt;file-id&gt; /output/path.txt \
+  --passphrase "your-passphrase"</code></pre>
+
+      <h3>Remove a File</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python src/efs.py rm /path/to/vault &lt;file-id&gt; --passphrase "your-passphrase"</code></pre>
+
+      <h3>Rename a File</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>python src/efs.py rename /path/to/vault &lt;file-id&gt; "new-name.txt" \
+  --passphrase "your-passphrase"</code></pre>
+
+      <h3>Rotate Master Key</h3>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code># Change passphrase only
+python src/efs.py rotate-master /path/to/vault \
+  --passphrase "old-passphrase" --new-passphrase "new-passphrase"
+
+# Change passphrase and update Argon2 parameters
+python src/efs.py rotate-master /path/to/vault \
+  --passphrase "old-passphrase" --new-passphrase "new-passphrase" \
+  -t 8 -m 524288 -p 4</code></pre>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 Tip</div>
+        <p>Master key rotation only rewrites the vault header — individual file blobs are <em>not</em> re-encrypted, so it is fast even for large vaults.</p>
+      </div>
+    </section>
+
+    <!-- CLI Reference -->
+    <section id="cli-reference">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+        CLI Reference
+      </h2>
+      <table class="cmd-table">
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>init &lt;vault&gt;</code></td><td>Create and initialize a new encrypted vault</td></tr>
+          <tr><td><code>add &lt;vault&gt; &lt;file&gt;</code></td><td>Add a file to the vault</td></tr>
+          <tr><td><code>ls &lt;vault&gt;</code></td><td>List all files stored in the vault</td></tr>
+          <tr><td><code>extract &lt;vault&gt; &lt;id&gt; &lt;out&gt;</code></td><td>Extract a file from the vault to the given output path</td></tr>
+          <tr><td><code>rm &lt;vault&gt; &lt;id&gt;</code></td><td>Remove a file from the vault</td></tr>
+          <tr><td><code>rename &lt;vault&gt; &lt;id&gt; &lt;name&gt;</code></td><td>Rename a file without decrypting it</td></tr>
+          <tr><td><code>rotate-master &lt;vault&gt;</code></td><td>Change the master passphrase (and optionally Argon2 parameters)</td></tr>
+          <tr><td><code>gui [vault]</code></td><td>Launch the graphical interface, optionally pre-loading a vault</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Global Options</h3>
+      <table class="cmd-table">
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--passphrase &lt;str&gt;</code></td><td>Current master passphrase (required for all vault operations)</td></tr>
+          <tr><td><code>--new-passphrase &lt;str&gt;</code></td><td>New master passphrase for <code>rotate-master</code></td></tr>
+          <tr><td><code>--relpath &lt;path&gt;</code></td><td>Virtual path inside the vault when adding files (preserves folder structure)</td></tr>
+          <tr><td><code>-t &lt;int&gt;</code></td><td>Argon2 time cost — default <code>4</code></td></tr>
+          <tr><td><code>-m &lt;int&gt;</code></td><td>Argon2 memory cost in KiB — default <code>262144</code></td></tr>
+          <tr><td><code>-p &lt;int&gt;</code></td><td>Argon2 parallelism — default <code>2</code></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Vault Structure -->
+    <section id="vault-structure">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Vault Structure
+      </h2>
+      <p>When you initialize a vault at <code>/path/to/vault</code>, the following directory structure is created on disk:</p>
+
+      <div class="dir-tree">
+        <span class="dir">vault/</span><br>
+        ├── <span class="file">vault.enc</span>           <span class="comment"># Binary encrypted metadata index</span><br>
+        └── <span class="dir">blobs/</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">&lt;uuid-1&gt;.bin</span>    <span class="comment"># Encrypted file blob (nonce + ciphertext)</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">&lt;uuid-2&gt;.bin</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;└── <span class="comment">...</span>
+      </div>
+
+      <ul style="margin-top:1rem;">
+        <li><strong>vault.enc</strong> — holds the encrypted metadata index (filenames, UUIDs, per-file keys). Nothing is readable without the correct passphrase.</li>
+        <li><strong>blobs/&lt;uuid&gt;.bin</strong> — each blob is the raw nonce followed by the AES-256-GCM ciphertext of a single file. The UUID is meaningless without the metadata.</li>
+      </ul>
+    </section>
+
+    <!-- Binary Format -->
+    <section id="binary-format">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Binary Format
+      </h2>
+      <p>The <code>vault.enc</code> header is a fixed-size 45-byte binary structure followed by the encrypted metadata ciphertext.</p>
+
+      <table class="binary-table">
+        <thead>
+          <tr><th>Field</th><th>Size</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="field">Magic</td><td class="bytes">4 bytes</td><td>ASCII <code>"EFS1"</code> — identifies the file format</td></tr>
+          <tr><td class="field">Version</td><td class="bytes">1 byte</td><td><code>0x01</code> — format version</td></tr>
+          <tr><td class="field">T-Cost</td><td class="bytes">4 bytes</td><td>Argon2 time cost (big-endian uint32)</td></tr>
+          <tr><td class="field">M-Cost</td><td class="bytes">4 bytes</td><td>Argon2 memory cost in KiB (big-endian uint32)</td></tr>
+          <tr><td class="field">Parallelism</td><td class="bytes">4 bytes</td><td>Argon2 parallelism factor (big-endian uint32)</td></tr>
+          <tr><td class="field">Salt</td><td class="bytes">16 bytes</td><td>Cryptographically random KDF salt</td></tr>
+          <tr><td class="field">Nonce</td><td class="bytes">12 bytes</td><td>96-bit random AEAD nonce</td></tr>
+          <tr><td class="field">Ciphertext</td><td class="bytes">variable</td><td>AES-256-GCM encrypted JSON metadata</td></tr>
+        </tbody>
+      </table>
+
+      <h3>File Blob Format</h3>
+      <p>Each <code>blobs/&lt;uuid&gt;.bin</code> file has a minimal format:</p>
+      <table class="binary-table">
+        <thead>
+          <tr><th>Field</th><th>Size</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="field">Nonce</td><td class="bytes">12 bytes</td><td>96-bit random nonce for this blob</td></tr>
+          <tr><td class="field">Ciphertext</td><td class="bytes">variable</td><td>AES-256-GCM ciphertext of the original file</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Project Structure -->
+    <section id="project-structure">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Project Structure
+      </h2>
+      <div class="dir-tree">
+        <span class="dir">Encrypted-Vault/</span><br>
+        ├── <span class="dir">src/</span><br>
+        │&nbsp;&nbsp; ├── <span class="file">efs.py</span>                     <span class="comment"># Main entry point</span><br>
+        │&nbsp;&nbsp; ├── <span class="dir">crypto/</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">aead.py</span>             <span class="comment"># AES-256-GCM encrypt / decrypt</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="file">hash.py</span>             <span class="comment"># SHA3-512 + Argon2id KDF</span><br>
+        │&nbsp;&nbsp; ├── <span class="dir">storage/</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="file">vault.py</span>            <span class="comment"># Binary vault read / write</span><br>
+        │&nbsp;&nbsp; ├── <span class="dir">utils/</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">core.py</span>             <span class="comment"># init, add, ls, extract commands</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">maintain.py</span>         <span class="comment"># rename, rm, rotate-master commands</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">dataModels.py</span>       <span class="comment"># Data structures &amp; constants</span><br>
+        │&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="file">helper.py</span>           <span class="comment"># Shared utility functions</span><br>
+        │&nbsp;&nbsp; └── <span class="dir">ui/</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">cli.py</span>              <span class="comment"># CLI argument parser</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">gui.py</span>              <span class="comment"># Main PyQt6 GUI application</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="dir">gui_components/</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">dialogs.py</span>      <span class="comment"># Dialog windows</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">file_operations.py</span> <span class="comment"># Add / extract / remove</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; │&nbsp;&nbsp; ├── <span class="file">tree_operations.py</span> <span class="comment"># Tree view management</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; │&nbsp;&nbsp; └── <span class="file">vault_operations.py</span> <span class="comment"># Unlock / lock / rotate</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">ImageViewer.py</span>      <span class="comment"># In-vault image preview</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">PDFViewer.py</span>        <span class="comment"># In-vault PDF preview</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">VideoPlayer.py</span>      <span class="comment"># In-vault video playback</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; ├── <span class="file">AudioPlayer.py</span>      <span class="comment"># In-vault audio playback</span><br>
+        │&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; └── <span class="file">TextEditor.py</span>       <span class="comment"># In-vault text viewer / editor</span><br>
+        ├── <span class="file">requirements.txt</span>           <span class="comment"># Python dependencies</span><br>
+        ├── <span class="file">vault.exe.spec</span>             <span class="comment"># PyInstaller specification</span><br>
+        ├── <span class="file">icon.ico</span>                   <span class="comment"># Application icon</span><br>
+        └── <span class="file">LICENSE</span>                    <span class="comment"># MIT License</span>
+      </div>
+    </section>
+
+    <!-- Security -->
+    <section id="security">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Security Details
+      </h2>
+
+      <h3>Encryption</h3>
+      <ul>
+        <li><strong>Algorithm:</strong> AES-256-GCM — authenticated encryption; ciphertext integrity is cryptographically verified on every read.</li>
+        <li><strong>Key size:</strong> 256-bit (32 bytes) per-file random key, independently generated for every file.</li>
+        <li><strong>Nonce:</strong> 96-bit random nonce per encryption operation — never reused.</li>
+        <li><strong>Key wrapping:</strong> Per-file keys are encrypted with the master key before being stored in <code>vault.enc</code>.</li>
+      </ul>
+
+      <h3>Key Derivation</h3>
+      <ul>
+        <li><strong>Algorithm:</strong> Argon2id — memory-hard, resists GPU/ASIC brute-force and side-channel attacks.</li>
+        <li><strong>Pre-hashing:</strong> The passphrase is pre-hashed with SHA3-512 before being passed to Argon2id for additional length-normalisation.</li>
+        <li><strong>Salt:</strong> 128-bit random salt stored in <code>vault.enc</code> — unique per vault, regenerated on master key rotation.</li>
+        <li><strong>Configurable parameters:</strong> Time cost, memory cost, and parallelism are tunable to match your hardware.</li>
+      </ul>
+
+      <div class="callout danger">
+        <div class="callout-title">⚠️ Critical Warnings</div>
+        <p>
+          <strong>Passphrase loss = permanent data loss.</strong> There is no backdoor or recovery mechanism.<br>
+          Always store your passphrase securely (e.g., a password manager or encrypted offline backup).
+        </p>
+      </div>
+
+      <h3>Threat Model</h3>
+      <p>Encrypted Vault protects files <strong>at rest</strong>. It does <em>not</em> protect:</p>
+      <ul>
+        <li>Files while they are unlocked in memory</li>
+        <li>Against malware or keyloggers running on your system</li>
+        <li>Against an adversary with physical access to an <em>unlocked</em> vault</li>
+        <li>Network transmission (use HTTPS/SSH for transfers)</li>
+      </ul>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Not a Replacement For</div>
+        <p>Full-disk encryption (BitLocker, FileVault, LUKS), operating system security, enterprise key management systems, or network-level security measures.</p>
+      </div>
+
+      <h3>Secure Storage Recommendations</h3>
+      <ul>
+        <li>Never commit passphrases or unencrypted secrets to version control.</li>
+        <li>Set restrictive filesystem permissions on your vault directory (<code>chmod 700</code> on Linux/macOS).</li>
+        <li>Store <code>vault.enc</code> and <code>blobs/</code> in a location with appropriate access controls.</li>
+        <li>Keep all dependencies up to date to patch security vulnerabilities.</li>
+      </ul>
+    </section>
+
+    <!-- Best Practices -->
+    <section id="best-practices">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Best Practices
+      </h2>
+      <ul>
+        <li>Use a <strong>strong, unique passphrase</strong> — 20+ characters, mixed case, numbers, and symbols.</li>
+        <li>Enable <strong>full-disk encryption</strong> on your system (BitLocker / FileVault / LUKS) as a complementary layer.</li>
+        <li>Keep your <strong>operating system and dependencies updated</strong> to patch security vulnerabilities.</li>
+        <li>Use <strong>higher Argon2 parameters</strong> (<code>-t</code>, <code>-m</code>) on powerful machines for better brute-force resistance.</li>
+        <li><strong>Back up your encrypted vault</strong> to multiple locations (local + cloud) to protect against hardware failure.</li>
+        <li>Rotate your master key periodically or immediately after any suspected passphrase exposure.</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">💡 Tip</div>
+        <p>Because the vault format is GitHub-friendly, you can push your encrypted vault to a private GitHub repository as an off-site backup — the blobs are opaque binary files that Git handles efficiently.</p>
+      </div>
+    </section>
+
+    <!-- Building Executable -->
+    <section id="building">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Building a Standalone Executable
+      </h2>
+      <p>
+        You can bundle Encrypted Vault into a self-contained <code>.exe</code> (or binary on Linux/macOS) that
+        doesn't require Python to be installed on the target machine.
+      </p>
+      <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>pyinstaller vault.exe.spec</code></pre>
+      <p>The packaged application will be created in the <code>dist/</code> directory as <code>vault.exe</code>. You can distribute this file as a standalone application.</p>
+
+      <div class="callout info">
+        <div class="callout-title">ℹ️ Note</div>
+        <p>PyInstaller must be installed (<code>pip install pyinstaller</code>) and the <code>vault.exe.spec</code> configuration file must be present in the repository root.</p>
+      </div>
+    </section>
+
+    <!-- Contributing -->
+    <section id="contributing">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Contributing
+      </h2>
+      <p>Contributions are welcome! Please follow these steps:</p>
+      <ol class="steps">
+        <li><div class="step-body"><strong>Fork the repository</strong><p>Click <em>Fork</em> on <a href="https://github.com/AadithyanRaju/Encrypted-Vault" target="_blank" rel="noopener">GitHub</a> to create your own copy.</p></div></li>
+        <li><div class="step-body"><strong>Create a feature branch</strong>
+          <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>git checkout -b feature/your-amazing-feature</code></pre>
+        </div></li>
+        <li><div class="step-body"><strong>Make your changes</strong><p>Keep changes focused, minimal, and well-tested.</p></div></li>
+        <li><div class="step-body"><strong>Commit with a descriptive message</strong>
+          <pre data-lang="bash"><button class="copy-btn" onclick="copyCode(this)">copy</button><code>git commit -m "feat: add support for XYZ"</code></pre>
+        </div></li>
+        <li><div class="step-body"><strong>Open a Pull Request</strong><p>Push your branch and open a PR against the <code>main</code> branch describing your changes.</p></div></li>
+      </ol>
+    </section>
+
+    <!-- License -->
+    <section id="license">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        License
+      </h2>
+      <p>
+        This project is licensed under the <strong>MIT License</strong>.
+        See the <a href="https://github.com/AadithyanRaju/Encrypted-Vault/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> file for details.
+      </p>
+      <p>
+        <strong>Copyright © 2025 Aadithyan Raju</strong>
+      </p>
+      <p style="font-size:0.85rem; color: var(--text-muted);">
+        Built with <a href="https://cryptography.io/" target="_blank" rel="noopener">cryptography</a>,
+        <a href="https://www.riverbankcomputing.com/software/pyqt/" target="_blank" rel="noopener">PyQt6</a>, and
+        <a href="https://github.com/hynek/argon2-cffi" target="_blank" rel="noopener">argon2-cffi</a>.
+      </p>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Disclaimer</div>
+        <p>This software is provided "as is" without warranty of any kind. Use at your own risk. The authors are not responsible for data loss, security breaches, or any other damages resulting from the use of this software. Always maintain backups of important data.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <p>
+    <a href="https://github.com/AadithyanRaju/Encrypted-Vault" target="_blank" rel="noopener">Encrypted Vault</a>
+    — Copyright © 2025 Aadithyan Raju — MIT License
+  </p>
+</footer>
+
+<script>
+  /* ─── Copy button ────────────────────────────────────────────── */
+  function copyCode(btn) {
+    const code = btn.closest('pre').querySelector('code');
+    navigator.clipboard.writeText(code.innerText).then(() => {
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 1800);
+    });
+  }
+
+  /* ─── Tabs ───────────────────────────────────────────────────── */
+  function switchTab(btn, panelId) {
+    const tabList = btn.closest('.tab-list');
+    const tabs    = btn.closest('.tabs');
+
+    tabList.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    tabs.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+    btn.classList.add('active');
+    document.getElementById(panelId).classList.add('active');
+  }
+
+  /* ─── Mobile sidebar ─────────────────────────────────────────── */
+  const menuToggle = document.getElementById('menuToggle');
+  const sidebar    = document.getElementById('sidebar');
+  const overlay    = document.getElementById('overlay');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('show');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('show');
+  }
+
+  menuToggle.addEventListener('click', () => {
+    sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  /* ─── Active nav link on scroll ─────────────────────────────── */
+  const sections = document.querySelectorAll('section[id], .hero');
+  const navLinks = document.querySelectorAll('.sidebar nav a');
+
+  function updateActiveLink() {
+    const scrollY = window.scrollY + 80;
+    let current = '';
+
+    sections.forEach(sec => {
+      if (sec.offsetTop <= scrollY) {
+        current = sec.id || 'overview';
+      }
+    });
+
+    navLinks.forEach(link => {
+      link.classList.remove('active');
+      if (link.getAttribute('href') === '#' + current) {
+        link.classList.add('active');
+      }
+    });
+  }
+
+  window.addEventListener('scroll', updateActiveLink, { passive: true });
+  updateActiveLink();
+</script>
+
+</body>
+</html>
