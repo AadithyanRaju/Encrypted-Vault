@@ -1,4 +1,5 @@
 import argparse
+import base64
 import os
 import sys
 import uuid
@@ -9,25 +10,39 @@ from typing import Dict
 
 from crypto.aead import aead_encrypt, aead_decrypt
 from crypto.hash import derive_kmaster
+from crypto.secure_bytes import SecureBytes, wipe_key
 from storage.vault import save_vault, load_vault
 from utils.helper import repo_paths, rel_time_iso
 from utils.dataModels import InnerMetadata, KeyWrap, FileEntry
 
-def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: bytes) -> FileEntry:
+
+def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: "bytes | SecureBytes") -> FileEntry:
+    """Encrypt *src* and store it as a new blob inside the vault.
+
+    *kmaster* may be plain ``bytes`` or a ``SecureBytes`` instance; it is
+    converted to ``bytes`` internally and the per-file key is wiped once
+    the blob has been written.
+    """
     p = repo_paths(repo)
-    file_key = os.urandom(32)
-    plaintext = src.read_bytes()
-    file_nonce = os.urandom(12)
-    file_ct = AESGCM(file_key).encrypt(file_nonce, plaintext, None)
+    kmaster_bytes = bytes(kmaster)  # safe whether kmaster is bytes or SecureBytes
+    file_key = SecureBytes(os.urandom(32))
+    try:
+        plaintext = src.read_bytes()
+        file_nonce = os.urandom(12)
+        file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, plaintext, None)
 
-    fid = str(uuid.uuid4())
-    blob_path = p["blobs"] / f"{fid}.bin"
-    with blob_path.open("wb") as f:
-        f.write(file_nonce + file_ct)
+        fid = str(uuid.uuid4())
+        blob_path = p["blobs"] / f"{fid}.bin"
+        with blob_path.open("wb") as f:
+            f.write(file_nonce + file_ct)
 
-    wrap_nonce, wrap_ct = aead_encrypt(kmaster, file_key)
-    import base64
-    keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
+        wrap_nonce, wrap_ct = aead_encrypt(kmaster_bytes, bytes(file_key))
+        keywrap = KeyWrap(
+            nonce_b64=base64.b64encode(wrap_nonce).decode(),
+            ct_b64=base64.b64encode(wrap_ct).decode(),
+        )
+    finally:
+        file_key.wipe()
 
     # normalize relpath to POSIX style if provided
     relpath_value = str(Path(relpath).as_posix()) if relpath else None
@@ -57,23 +72,30 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     salt = os.urandom(16)
     kmaster = derive_kmaster(args.passphrase, salt, args.t, args.m, args.p)
+    try:
+        # Empty inner metadata
+        inner = InnerMetadata(version=1, files=[])
+        inner_bytes = inner.to_bytes()
 
-    # Empty inner metadata
-    inner = InnerMetadata(version=1, files=[])
-    inner_bytes = inner.to_bytes()
-
-    # Encrypt inner under Kmaster
-    nonce, ct = aead_encrypt(kmaster, inner_bytes)
+        # Encrypt inner under Kmaster
+        nonce, ct = aead_encrypt(bytes(kmaster), inner_bytes)
+    finally:
+        kmaster.wipe()
 
     save_vault(p["vault"], args.t, args.m, args.p, salt, nonce, ct)
     print(f"[+] Initialized vault at {repo}")
 
 
-def unlock(repo: Path, passphrase: str) -> tuple[InnerMetadata, bytes, Dict[str, int | bytes]]:
+def unlock(repo: Path, passphrase: str) -> "tuple[InnerMetadata, SecureBytes, Dict[str, int | bytes]]":
+    """Decrypt and return the vault's inner metadata together with the master key.
+
+    The caller is responsible for wiping the returned ``SecureBytes``
+    (``kmaster``) when it is no longer needed.
+    """
     p = repo_paths(repo)
     t, m, paral, salt, nonce, ct = load_vault(p["vault"])
     kmaster = derive_kmaster(passphrase, salt, t, m, paral)
-    inner_bytes = aead_decrypt(kmaster, nonce, ct)
+    inner_bytes = aead_decrypt(bytes(kmaster), nonce, ct)
     inner = InnerMetadata.from_bytes(inner_bytes)
     return inner, kmaster, {"t": t, "m": m, "p": paral, "salt": salt}
 
@@ -83,36 +105,43 @@ def update_file_in_vault(repo: Path, fid: str, new_content: bytes, passphrase: s
     inner, kmaster, kdf = unlock(repo, passphrase)
     p = repo_paths(repo)
 
-    # Find the file entry
-    match = next((f for f in inner.files if f["id"] == fid), None)
-    if not match:
-        raise ValueError(f"No such id: {fid}")
+    try:
+        # Find the file entry
+        match = next((f for f in inner.files if f["id"] == fid), None)
+        if not match:
+            raise ValueError(f"No such id: {fid}")
 
-    # Generate new per-file key
-    file_key = os.urandom(32)  # AES-256
+        # Generate new per-file key
+        file_key = SecureBytes(os.urandom(32))
+        try:
+            # Encrypt new content with new file_key
+            file_nonce = os.urandom(12)
+            file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, new_content, None)
 
-    # Encrypt new content with new file_key
-    file_nonce = os.urandom(12)
-    file_ct = AESGCM(file_key).encrypt(file_nonce, new_content, None)
+            # Write new blob: nonce||ct
+            blob_path = p["blobs"] / f"{fid}.bin"
+            with blob_path.open("wb") as f:
+                f.write(file_nonce + file_ct)
 
-    # Write new blob: nonce||ct
-    blob_path = p["blobs"] / f"{fid}.bin"
-    with blob_path.open("wb") as f:
-        f.write(file_nonce + file_ct)
+            # Wrap new file_key with Kmaster
+            wrap_nonce, wrap_ct = aead_encrypt(bytes(kmaster), bytes(file_key))
+            keywrap = KeyWrap(
+                nonce_b64=base64.b64encode(wrap_nonce).decode(),
+                ct_b64=base64.b64encode(wrap_ct).decode(),
+            )
+        finally:
+            file_key.wipe()
 
-    # Wrap new file_key with Kmaster
-    wrap_nonce, wrap_ct = aead_encrypt(kmaster, file_key)
-    import base64
-    keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
+        # Update the file entry
+        match["size"] = len(new_content)
+        match["file_key_wrap"] = keywrap.to_dict()
 
-    # Update the file entry
-    match["size"] = len(new_content)
-    match["file_key_wrap"] = keywrap.to_dict()
-
-    # Re-encrypt inner and save vault
-    inner_bytes = inner.to_bytes()
-    new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
-    save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+        # Re-encrypt inner and save vault
+        inner_bytes = inner.to_bytes()
+        new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
+        save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+    finally:
+        kmaster.wipe()
 
 
 def cmd_add(args: argparse.Namespace) -> None:
@@ -125,61 +154,73 @@ def cmd_add(args: argparse.Namespace) -> None:
     inner, kmaster, kdf = unlock(repo, args.passphrase)
     p = repo_paths(repo)
 
-    # Generate per-file key
-    file_key = os.urandom(32)  # AES-256
+    try:
+        # Generate per-file key
+        file_key = SecureBytes(os.urandom(32))
 
-    # Read plaintext
-    plaintext = src.read_bytes()
+        # Read plaintext
+        plaintext = src.read_bytes()
 
-    # Encrypt file content with file_key
-    file_nonce = os.urandom(12)
-    file_ct = AESGCM(file_key).encrypt(file_nonce, plaintext, None)
+        try:
+            # Encrypt file content with file_key
+            file_nonce = os.urandom(12)
+            file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, plaintext, None)
 
-    # Write blob: nonce||ct
-    fid = str(uuid.uuid4())
-    blob_path = p["blobs"] / f"{fid}.bin"
-    with blob_path.open("wb") as f:
-        f.write(file_nonce + file_ct)
+            # Write blob: nonce||ct
+            fid = str(uuid.uuid4())
+            blob_path = p["blobs"] / f"{fid}.bin"
+            with blob_path.open("wb") as f:
+                f.write(file_nonce + file_ct)
 
-    # Wrap file_key with Kmaster
-    wrap_nonce, wrap_ct = aead_encrypt(kmaster, file_key)
-    import base64
-    keywrap = KeyWrap(nonce_b64=base64.b64encode(wrap_nonce).decode(), ct_b64=base64.b64encode(wrap_ct).decode())
+            # Wrap file_key with Kmaster
+            wrap_nonce, wrap_ct = aead_encrypt(bytes(kmaster), bytes(file_key))
+            keywrap = KeyWrap(
+                nonce_b64=base64.b64encode(wrap_nonce).decode(),
+                ct_b64=base64.b64encode(wrap_ct).decode(),
+            )
+        finally:
+            file_key.wipe()
 
-    # Optional relative path metadata to preserve folder structure
-    relpath_value = getattr(args, "relpath", None)
-    if relpath_value:
-        # normalize separators to POSIX-style for portability
-        relpath_value = str(Path(relpath_value).as_posix())
+        # Optional relative path metadata to preserve folder structure
+        relpath_value = getattr(args, "relpath", None)
+        if relpath_value:
+            # normalize separators to POSIX-style for portability
+            relpath_value = str(Path(relpath_value).as_posix())
 
-    entry = FileEntry(
-        id=fid,
-        name=src.name,
-        relpath=relpath_value,
-        blob=f"blobs/{fid}.bin",
-        size=len(plaintext),
-        created_at=rel_time_iso(os.path.getctime(src)),
-        modified_at=rel_time_iso(os.path.getmtime(src)),
-        mimetype=None,
-        file_key_wrap=keywrap,
-    )
-    inner.files.append(entry.to_dict())
+        entry = FileEntry(
+            id=fid,
+            name=src.name,
+            relpath=relpath_value,
+            blob=f"blobs/{fid}.bin",
+            size=len(plaintext),
+            created_at=rel_time_iso(os.path.getctime(src)),
+            modified_at=rel_time_iso(os.path.getmtime(src)),
+            mimetype=None,
+            file_key_wrap=keywrap,
+        )
+        inner.files.append(entry.to_dict())
 
-    # Re-encrypt inner and save vault
-    inner_bytes = inner.to_bytes()
-    new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
-    save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+        # Re-encrypt inner and save vault
+        inner_bytes = inner.to_bytes()
+        new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
+        save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
+    finally:
+        kmaster.wipe()
+
     print(f"[+] Encrypted and added {src.name} as id={fid}")
 
 
 def cmd_ls(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
-    inner, _, _ = unlock(repo, args.passphrase)
-    if not inner.files:
-        print("(empty)")
-        return
-    for fobj in inner.files:
-        print(f"{fobj['id']}\t{fobj['name']}\t{fobj['size']} bytes\t{fobj['blob']}")
+    inner, kmaster, _ = unlock(repo, args.passphrase)
+    try:
+        if not inner.files:
+            print("(empty)")
+            return
+        for fobj in inner.files:
+            print(f"{fobj['id']}\t{fobj['name']}\t{fobj['size']} bytes\t{fobj['blob']}")
+    finally:
+        kmaster.wipe()
 
 
 def cmd_extract(args: argparse.Namespace) -> None:
@@ -189,24 +230,30 @@ def cmd_extract(args: argparse.Namespace) -> None:
 
     inner, kmaster, _ = unlock(repo, args.passphrase)
 
-    match = next((f for f in inner.files if f["id"] == fid), None)
-    if not match:
-        print(f"[!] No such id: {fid}")
-        sys.exit(1)
+    try:
+        match = next((f for f in inner.files if f["id"] == fid), None)
+        if not match:
+            print(f"[!] No such id: {fid}")
+            sys.exit(1)
 
-    # Unwrap per-file key
-    import base64
-    wrap = match["file_key_wrap"]
-    file_key = aead_decrypt(kmaster, base64.b64decode(wrap["nonce"]), base64.b64decode(wrap["ct"]))
-
-    # Read blob and decrypt
-    blob_path = Path(repo) / match["blob"]
-    blob = blob_path.read_bytes()
-    if len(blob) < 13:
-        print("[!] Corrupt blob")
-        sys.exit(1)
-    file_nonce, file_ct = blob[:12], blob[12:]
-    plaintext = AESGCM(file_key).decrypt(file_nonce, file_ct, None)
+        # Unwrap per-file key
+        wrap = match["file_key_wrap"]
+        file_key = SecureBytes(
+            aead_decrypt(bytes(kmaster), base64.b64decode(wrap["nonce"]), base64.b64decode(wrap["ct"]))
+        )
+        try:
+            # Read blob and decrypt
+            blob_path = Path(repo) / match["blob"]
+            blob = blob_path.read_bytes()
+            if len(blob) < 13:
+                print("[!] Corrupt blob")
+                sys.exit(1)
+            file_nonce, file_ct = blob[:12], blob[12:]
+            plaintext = AESGCM(bytes(file_key)).decrypt(file_nonce, file_ct, None)
+        finally:
+            file_key.wipe()
+    finally:
+        kmaster.wipe()
 
     out.write_bytes(plaintext)
     print(f"[+] Extracted {match['name']} -> {out}")
