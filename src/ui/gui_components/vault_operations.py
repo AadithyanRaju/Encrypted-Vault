@@ -69,6 +69,13 @@ def lock_vault(parent_window):
     Args:
         parent_window: Parent window with UI elements to update
     """
+    # Wipe the master key before clearing the reference.
+    if parent_window.kmaster is not None:
+        try:
+            parent_window.kmaster.wipe()
+        except Exception:
+            pass
+
     # Clear unlocked state but keep repo path
     parent_window.inner = None
     parent_window.kmaster = None
@@ -125,6 +132,13 @@ def close_repository(parent_window):
     )
     if reply != QtWidgets.QMessageBox.StandardButton.Yes:
         return False
+
+    # Wipe the master key before clearing the reference.
+    if parent_window.kmaster is not None:
+        try:
+            parent_window.kmaster.wipe()
+        except Exception:
+            pass
 
     # Clear internal state
     parent_window.repo = None

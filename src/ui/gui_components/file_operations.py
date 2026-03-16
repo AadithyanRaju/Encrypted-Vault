@@ -164,7 +164,7 @@ def add_folder(parent_window, repo, passphrase, populate_callback):
                 for entry in success_entries:
                     inner.files.append(entry.to_dict())
                 inner_bytes = inner.to_bytes()
-                new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
+                new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
                 p = repo_paths(repo)
                 save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
 
@@ -290,7 +290,7 @@ def remove_selected_files(parent_window, repo, passphrase, selected_files, popul
                 remaining = [f for f in inner.files if f["id"] not in success_ids]
                 inner.files = remaining
                 inner_bytes = inner.to_bytes()
-                new_nonce, new_ct = aead_encrypt(kmaster, inner_bytes)
+                new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
                 p = repo_paths(repo)
                 save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
 
