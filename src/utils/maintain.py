@@ -1,5 +1,6 @@
 import argparse
 import base64
+import getpass
 import os
 import sys
 
@@ -17,7 +18,8 @@ from utils.helper import repo_paths
 def cmd_rm(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
     fid = args.id
-    inner, kmaster, kdf = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
+    inner, kmaster, kdf = unlock(repo, passphrase)
     try:
         match = next((f for f in inner.files if f["id"] == fid), None)
         if not match:
@@ -44,7 +46,8 @@ def cmd_rename(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
     fid = args.id
     new_name = args.name
-    inner, kmaster, kdf = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
+    inner, kmaster, kdf = unlock(repo, passphrase)
     try:
         match = next((f for f in inner.files if f["id"] == fid), None)
         if not match:
@@ -69,7 +72,8 @@ def cmd_rotate_master(args: argparse.Namespace) -> None:
       4) Re-encrypt inner JSON under new_kmaster and write new header.
     """
     repo = Path(args.repo)
-    inner, old_kmaster, old_kdf = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Current passphrase: ")
+    inner, old_kmaster, old_kdf = unlock(repo, passphrase)
 
     # New KDF params
     new_t = args.t if args.t is not None else old_kdf["t"]
@@ -77,7 +81,14 @@ def cmd_rotate_master(args: argparse.Namespace) -> None:
     new_p = args.p if args.p is not None else old_kdf["p"]
     new_salt = os.urandom(16)
 
-    new_kmaster = derive_kmaster(args.new_passphrase or args.passphrase, new_salt, new_t, new_m, new_p)
+    # Use hasattr to distinguish CLI (no attribute → prompt) from direct calls
+    # where new_passphrase=None means "keep current passphrase"
+    if hasattr(args, "new_passphrase"):
+        new_passphrase = args.new_passphrase or passphrase
+    else:
+        prompted = getpass.getpass("New passphrase (leave blank to keep current): ")
+        new_passphrase = prompted if prompted else passphrase
+    new_kmaster = derive_kmaster(new_passphrase, new_salt, new_t, new_m, new_p)
 
     try:
         # Rewrap file keys

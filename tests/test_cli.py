@@ -29,12 +29,12 @@ from ui.cli import build_parser
 from utils.core import cmd_init, cmd_add, unlock
 
 
-def _run_cli(argv: list[str]) -> tuple[int, str]:
+def _run_cli(argv: list[str], passphrase: str = TEST_PASSPHRASE) -> tuple[int, str]:
     """Run the CLI with the given argv and capture stdout, returning (exit_code, output)."""
     parser = build_parser()
     buf = StringIO()
     try:
-        with patch("sys.stdout", buf):
+        with patch("sys.stdout", buf), patch("getpass.getpass", return_value=passphrase):
             args = parser.parse_args(argv)
             args.func(args)
         return 0, buf.getvalue()
@@ -49,54 +49,53 @@ class TestBuildParser:
 
     def test_init_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["init", "/tmp/testvault", "--passphrase", "pw"])
+        args = parser.parse_args(["init", "/tmp/testvault"])
         assert args.cmd == "init"
-        assert args.passphrase == "pw"
 
     def test_add_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["add", "/tmp/v", "/tmp/f.txt", "--passphrase", "pw"])
+        args = parser.parse_args(["add", "/tmp/v", "/tmp/f.txt"])
         assert args.cmd == "add"
 
     def test_ls_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["ls", "/tmp/v", "--passphrase", "pw"])
+        args = parser.parse_args(["ls", "/tmp/v"])
         assert args.cmd == "ls"
 
     def test_extract_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["extract", "/tmp/v", "some-id", "/tmp/out", "--passphrase", "pw"])
+        args = parser.parse_args(["extract", "/tmp/v", "some-id", "/tmp/out"])
         assert args.cmd == "extract"
         assert args.id == "some-id"
 
     def test_rm_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["rm", "/tmp/v", "some-id", "--passphrase", "pw"])
+        args = parser.parse_args(["rm", "/tmp/v", "some-id"])
         assert args.cmd == "rm"
 
     def test_rename_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["rename", "/tmp/v", "some-id", "newname.txt", "--passphrase", "pw"])
+        args = parser.parse_args(["rename", "/tmp/v", "some-id", "newname.txt"])
         assert args.cmd == "rename"
         assert args.name == "newname.txt"
 
     def test_rotate_master_subcommand_parsed(self):
         parser = build_parser()
-        args = parser.parse_args(["rotate-master", "/tmp/v", "--passphrase", "pw"])
+        args = parser.parse_args(["rotate-master", "/tmp/v"])
         assert args.cmd == "rotate-master"
 
     def test_init_defaults(self):
         from utils.dataModels import DEFAULT_T_COST, DEFAULT_M_COST_KiB, DEFAULT_PARALLELISM
         parser = build_parser()
-        args = parser.parse_args(["init", "/tmp/v", "--passphrase", "pw"])
+        args = parser.parse_args(["init", "/tmp/v"])
         assert args.t == DEFAULT_T_COST
         assert args.m == DEFAULT_M_COST_KiB
         assert args.p == DEFAULT_PARALLELISM
 
-    def test_missing_passphrase_exits(self):
+    def test_passphrase_argument_rejected(self):
         parser = build_parser()
         with pytest.raises(SystemExit):
-            parser.parse_args(["init", "/tmp/v"])
+            parser.parse_args(["init", "/tmp/v", "--passphrase", "pw"])
 
     def test_unknown_subcommand_exits(self):
         parser = build_parser()
@@ -106,66 +105,66 @@ class TestBuildParser:
 
 class TestCliInitCommand:
     def test_cli_init_creates_vault(self, tmp_path: Path):
-        code, out = _run_cli(["init", str(tmp_path), "--passphrase", TEST_PASSPHRASE,
+        code, out = _run_cli(["init", str(tmp_path),
                                "-t", str(FAST_T), "-m", str(FAST_M), "-p", str(FAST_P)])
         assert code == 0
         assert (tmp_path / "vault.enc").exists()
 
     def test_cli_init_prints_confirmation(self, tmp_path: Path):
-        _, out = _run_cli(["init", str(tmp_path), "--passphrase", TEST_PASSPHRASE,
+        _, out = _run_cli(["init", str(tmp_path),
                             "-t", str(FAST_T), "-m", str(FAST_M), "-p", str(FAST_P)])
         assert "Initialized" in out or "[+]" in out
 
     def test_cli_init_twice_exits(self, tmp_path: Path):
-        _run_cli(["init", str(tmp_path), "--passphrase", TEST_PASSPHRASE,
+        _run_cli(["init", str(tmp_path),
                   "-t", str(FAST_T), "-m", str(FAST_M), "-p", str(FAST_P)])
-        code, _ = _run_cli(["init", str(tmp_path), "--passphrase", TEST_PASSPHRASE,
+        code, _ = _run_cli(["init", str(tmp_path),
                              "-t", str(FAST_T), "-m", str(FAST_M), "-p", str(FAST_P)])
         assert code != 0
 
 
 class TestCliAddAndLs:
     def test_cli_add_and_ls(self, tmp_vault: Path, sample_file: Path):
-        code, out = _run_cli(["add", str(tmp_vault), str(sample_file), "--passphrase", TEST_PASSPHRASE])
+        code, out = _run_cli(["add", str(tmp_vault), str(sample_file)])
         assert code == 0
         assert sample_file.name in out or "[+]" in out
 
-        code2, ls_out = _run_cli(["ls", str(tmp_vault), "--passphrase", TEST_PASSPHRASE])
+        code2, ls_out = _run_cli(["ls", str(tmp_vault)])
         assert code2 == 0
         assert sample_file.name in ls_out
 
     def test_cli_ls_empty_vault(self, tmp_vault: Path):
-        code, out = _run_cli(["ls", str(tmp_vault), "--passphrase", TEST_PASSPHRASE])
+        code, out = _run_cli(["ls", str(tmp_vault)])
         assert code == 0
         assert "(empty)" in out
 
 
 class TestCliExtract:
     def test_cli_extract(self, tmp_vault: Path, sample_file: Path, tmp_path: Path):
-        _run_cli(["add", str(tmp_vault), str(sample_file), "--passphrase", TEST_PASSPHRASE])
+        _run_cli(["add", str(tmp_vault), str(sample_file)])
         inner, _, _ = unlock(tmp_vault, TEST_PASSPHRASE)
         fid = inner.files[0]["id"]
         out = tmp_path / "out.txt"
-        code, _ = _run_cli(["extract", str(tmp_vault), fid, str(out), "--passphrase", TEST_PASSPHRASE])
+        code, _ = _run_cli(["extract", str(tmp_vault), fid, str(out)])
         assert code == 0
         assert out.read_bytes() == sample_file.read_bytes()
 
 
 class TestCliRmAndRename:
     def test_cli_rm(self, tmp_vault: Path, sample_file: Path):
-        _run_cli(["add", str(tmp_vault), str(sample_file), "--passphrase", TEST_PASSPHRASE])
+        _run_cli(["add", str(tmp_vault), str(sample_file)])
         inner, _, _ = unlock(tmp_vault, TEST_PASSPHRASE)
         fid = inner.files[0]["id"]
-        code, out = _run_cli(["rm", str(tmp_vault), fid, "--passphrase", TEST_PASSPHRASE])
+        code, out = _run_cli(["rm", str(tmp_vault), fid])
         assert code == 0
         inner2, _, _ = unlock(tmp_vault, TEST_PASSPHRASE)
         assert inner2.files == []
 
     def test_cli_rename(self, tmp_vault: Path, sample_file: Path):
-        _run_cli(["add", str(tmp_vault), str(sample_file), "--passphrase", TEST_PASSPHRASE])
+        _run_cli(["add", str(tmp_vault), str(sample_file)])
         inner, _, _ = unlock(tmp_vault, TEST_PASSPHRASE)
         fid = inner.files[0]["id"]
-        code, _ = _run_cli(["rename", str(tmp_vault), fid, "renamed.txt", "--passphrase", TEST_PASSPHRASE])
+        code, _ = _run_cli(["rename", str(tmp_vault), fid, "renamed.txt"])
         assert code == 0
         inner2, _, _ = unlock(tmp_vault, TEST_PASSPHRASE)
         assert inner2.files[0]["name"] == "renamed.txt"

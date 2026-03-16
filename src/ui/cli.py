@@ -11,7 +11,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_init = sub.add_parser("init", help="Initialize vault")
     p_init.add_argument("repo", help="Path to repo directory")
-    p_init.add_argument("--passphrase", required=True)
+
     p_init.add_argument("-t", type=int, default=DEFAULT_T_COST, help=f"Argon2 time cost (iterations), DEFAULT={DEFAULT_T_COST}")
     p_init.add_argument("-m", type=int, default=DEFAULT_M_COST_KiB, help=f"Argon2 memory (KiB), DEFAULT={DEFAULT_M_COST_KiB}")
     p_init.add_argument("-p", type=int, default=DEFAULT_PARALLELISM, help=f"Argon2 parallelism, DEFAULT={DEFAULT_PARALLELISM}")
@@ -22,38 +22,31 @@ def build_parser() -> argparse.ArgumentParser:
     p_add.add_argument("repo", help="Path to repo directory")
     p_add.add_argument("path", help="Plaintext file to add")
     p_add.add_argument("--relpath", help="Relative path to preserve folder structure", required=False)
-    p_add.add_argument("--passphrase", required=True)
     p_add.set_defaults(func=cmd_add)
 
     p_ls = sub.add_parser("ls", help="List files (after unlock)")
     p_ls.add_argument("repo", help="Path to repo directory")
-    p_ls.add_argument("--passphrase", required=True)
     p_ls.set_defaults(func=cmd_ls)
 
     p_ext = sub.add_parser("extract", help="Decrypt a file by id")
     p_ext.add_argument("repo", help="Path to repo directory")
     p_ext.add_argument("id", help="File id (UUID)")
     p_ext.add_argument("out", help="Output plaintext path")
-    p_ext.add_argument("--passphrase", required=True)
     p_ext.set_defaults(func=cmd_extract)
 
     p_rm = sub.add_parser("rm", help="Remove a file by id")
     p_rm.add_argument("repo", help="Path to repo directory")
     p_rm.add_argument("id", help="File id (UUID)")
-    p_rm.add_argument("--passphrase", required=True)
     p_rm.set_defaults(func=cmd_rm)
 
     p_ren = sub.add_parser("rename", help="Rename a file entry")
     p_ren.add_argument("repo", help="Path to repo directory")
     p_ren.add_argument("id", help="File id (UUID)")
     p_ren.add_argument("name", help="New name")
-    p_ren.add_argument("--passphrase", required=True)
     p_ren.set_defaults(func=cmd_rename)
 
     p_rot = sub.add_parser("rotate-master", help="Rotate/Change master key and/or Argon2 params")
     p_rot.add_argument("repo", help="Path to repo directory")
-    p_rot.add_argument("--passphrase", required=True, help="Current passphrase")
-    p_rot.add_argument("--new-passphrase", help="New passphrase (default: reuse current)")
     p_rot.add_argument("-t", type=int, help="New Argon2 time cost (iterations)")
     p_rot.add_argument("-m", type=int, help="New Argon2 memory (KiB)")
     p_rot.add_argument("-p", type=int, help="New Argon2 parallelism")
