@@ -45,11 +45,19 @@ class FileEntry:
 class InnerMetadata:
     version: int
     files: List[Dict[str, Any]]
+    merkle_root: str | None = None  # base64-encoded SHA-256 Merkle root over blob files
 
     def to_bytes(self) -> bytes:
-        return json.dumps({"version": self.version, "files": self.files}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        data: Dict[str, Any] = {"version": self.version, "files": self.files}
+        if self.merkle_root is not None:
+            data["merkle_root"] = self.merkle_root
+        return json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
     @staticmethod
     def from_bytes(b: bytes) -> "InnerMetadata":
         obj = json.loads(b.decode("utf-8"))
-        return InnerMetadata(version=obj.get("version", 1), files=obj.get("files", []))
+        return InnerMetadata(
+            version=obj.get("version", 1),
+            files=obj.get("files", []),
+            merkle_root=obj.get("merkle_root"),
+        )
