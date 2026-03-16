@@ -231,3 +231,91 @@ class TestCmdRotateMaster:
         )
         cmd_extract(extract_args)
         assert out.read_bytes() == sample_file.read_bytes()
+
+
+# ---------------------------------------------------------------------------
+# Metadata protection: filename encryption & blob padding
+# ---------------------------------------------------------------------------
+
+class TestMetadataProtection:
+    """Verify filename encryption and size-obfuscation padding."""
+
+    def test_name_enc_present_after_add(self, tmp_vault: Path, sample_file: Path):
+        """name_enc must exist in the metadata dict after adding a file."""
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        assert "name_enc" in inner.files[0]
+
+    def test_plaintext_name_absent_from_serialised_json(self, tmp_vault: Path, sample_file: Path):
+        """After serialisation, the plaintext 'name' field must not appear when
+        name_enc is present (so it is never written to disk)."""
+        import json
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        data = json.loads(inner.to_bytes())
+        assert "name" not in data["files"][0]
+        assert "name_enc" in data["files"][0]
+
+    def test_unlock_decrypts_name(self, tmp_vault: Path, sample_file: Path):
+        """unlock() must populate the in-memory 'name' field from name_enc."""
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        assert inner.files[0]["name"] == sample_file.name
+
+    def test_relpath_enc_present_when_relpath_given(self, tmp_vault: Path, sample_file: Path):
+        """relpath_enc must exist when a relpath is provided during add."""
+        cmd_add(_add_args(tmp_vault, sample_file, relpath="docs/hello.txt"))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        assert "relpath_enc" in inner.files[0]
+
+    def test_unlock_decrypts_relpath(self, tmp_vault: Path, sample_file: Path):
+        """unlock() must populate the in-memory 'relpath' field from relpath_enc."""
+        cmd_add(_add_args(tmp_vault, sample_file, relpath="docs/hello.txt"))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        assert inner.files[0]["relpath"] == "docs/hello.txt"
+
+    def test_blob_size_within_padding_bounds(self, tmp_vault: Path, sample_file: Path):
+        """Blob must be at least real_size + nonce(12) + GCM-tag(16) bytes and
+        at most real_size + PAD_MAX + nonce(12) + GCM-tag(16) bytes."""
+        from utils.dataModels import PAD_MAX
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        fid = inner.files[0]["id"]
+        real_size = inner.files[0]["size"]
+        blob = (tmp_vault / "blobs" / f"{fid}.bin").read_bytes()
+        # blob = nonce(12) + AEAD(padded_plaintext) where AEAD overhead = 16
+        blob_data_len = len(blob) - 12
+        assert blob_data_len >= real_size + 16
+        assert blob_data_len <= real_size + PAD_MAX + 16
+
+    def test_rename_updates_name_enc(self, tmp_vault: Path, sample_file: Path):
+        """After rename, unlock() must return the new name via name_enc."""
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        fid = inner.files[0]["id"]
+        rename_args = argparse.Namespace(
+            repo=str(tmp_vault), id=fid, name="new_name.txt", passphrase=TEST_PASSPHRASE
+        )
+        cmd_rename(rename_args)
+        inner2, kmaster2, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster2.wipe()
+        assert inner2.files[0]["name"] == "new_name.txt"
+
+    def test_extract_strips_padding(self, tmp_vault: Path, sample_file: Path, tmp_path: Path):
+        """Extracted content must exactly match the original file despite padding."""
+        cmd_add(_add_args(tmp_vault, sample_file))
+        inner, kmaster, _ = unlock(tmp_vault, TEST_PASSPHRASE)
+        kmaster.wipe()
+        fid = inner.files[0]["id"]
+        out = tmp_path / "recovered.txt"
+        cmd_extract(argparse.Namespace(
+            repo=str(tmp_vault), id=fid, out=str(out), passphrase=TEST_PASSPHRASE
+        ))
+        assert out.read_bytes() == sample_file.read_bytes()

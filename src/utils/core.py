@@ -13,11 +13,34 @@ from crypto.hash import derive_kmaster
 from crypto.secure_bytes import SecureBytes, wipe_key
 from storage.vault import save_vault, load_vault
 from utils.helper import repo_paths, rel_time_iso
-from utils.dataModels import InnerMetadata, KeyWrap, FileEntry
+from utils.dataModels import InnerMetadata, KeyWrap, FileEntry, PAD_MAX
+
+
+def _encrypt_name(name: str, file_key: bytes) -> str:
+    """Encrypt *name* with *file_key* and return ``base64(nonce || ciphertext)``."""
+    nonce, ct = aead_encrypt(file_key, name.encode("utf-8"))
+    return base64.b64encode(nonce + ct).decode()
+
+
+def _decrypt_name(name_enc: str, file_key: bytes) -> str:
+    """Decrypt a ``base64(nonce || ciphertext)`` filename produced by :func:`_encrypt_name`."""
+    raw = base64.b64decode(name_enc)
+    nonce, ct = raw[:12], raw[12:]
+    return aead_decrypt(file_key, nonce, ct).decode("utf-8")
 
 
 def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: "bytes | SecureBytes") -> FileEntry:
     """Encrypt *src* and store it as a new blob inside the vault.
+
+    The plaintext is padded with up to ``PAD_MAX`` random bytes before
+    encryption to obfuscate the real file size on disk (size obfuscation).
+    The real plaintext size is preserved in ``FileEntry.size`` so the correct
+    content can be recovered on extraction.
+
+    The filename (and optional relative path) are encrypted with the per-file
+    key and stored as ``name_enc`` / ``relpath_enc`` in the metadata, so
+    filenames are never exposed in plaintext even within the encrypted metadata
+    blob.
 
     *kmaster* may be plain ``bytes`` or a ``SecureBytes`` instance; it is
     converted to ``bytes`` internally and the per-file key is wiped once
@@ -28,37 +51,49 @@ def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: "bytes
     file_key = SecureBytes(os.urandom(32))
     try:
         plaintext = src.read_bytes()
+        real_size = len(plaintext)
+
+        # --- size obfuscation: append random padding before encrypting ---
+        pad_len = int.from_bytes(os.urandom(2), "big") % (PAD_MAX + 1)
+        padded = plaintext + os.urandom(pad_len)
+
         file_nonce = os.urandom(12)
-        file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, plaintext, None)
+        file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, padded, None)
 
         fid = str(uuid.uuid4())
         blob_path = p["blobs"] / f"{fid}.bin"
-        with blob_path.open("wb") as f:
-            f.write(file_nonce + file_ct)
+        with blob_path.open("wb") as fh:
+            fh.write(file_nonce + file_ct)
 
         wrap_nonce, wrap_ct = aead_encrypt(kmaster_bytes, bytes(file_key))
         keywrap = KeyWrap(
             nonce_b64=base64.b64encode(wrap_nonce).decode(),
             ct_b64=base64.b64encode(wrap_ct).decode(),
         )
+
+        # --- filename encryption with per-file key ---
+        name_enc = _encrypt_name(src.name, bytes(file_key))
+        relpath_enc = None
+        normalized_relpath = None
+        if relpath:
+            normalized_relpath = str(Path(relpath).as_posix())
+            relpath_enc = _encrypt_name(normalized_relpath, bytes(file_key))
     finally:
         file_key.wipe()
 
-    # normalize relpath to POSIX style if provided
-    relpath_value = str(Path(relpath).as_posix()) if relpath else None
-
-    entry = FileEntry(
+    return FileEntry(
         id=fid,
         name=src.name,
-        relpath=relpath_value,
+        relpath=normalized_relpath,
         blob=f"blobs/{fid}.bin",
-        size=len(plaintext),
+        size=real_size,
         created_at=rel_time_iso(os.path.getctime(src)),
         modified_at=rel_time_iso(os.path.getmtime(src)),
         mimetype=None,
         file_key_wrap=keywrap,
+        name_enc=name_enc,
+        relpath_enc=relpath_enc,
     )
-    return entry
 
 def cmd_init(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
@@ -89,6 +124,12 @@ def cmd_init(args: argparse.Namespace) -> None:
 def unlock(repo: Path, passphrase: str) -> "tuple[InnerMetadata, SecureBytes, Dict[str, int | bytes]]":
     """Decrypt and return the vault's inner metadata together with the master key.
 
+    For entries that store filenames and relpaths in encrypted form
+    (``name_enc`` / ``relpath_enc``), the plaintext values are decrypted using
+    the per-file key and injected into the in-memory dict under ``name`` /
+    ``relpath`` so that the rest of the codebase can continue to use those
+    fields transparently.
+
     The caller is responsible for wiping the returned ``SecureBytes``
     (``kmaster``) when it is no longer needed.
     """
@@ -97,6 +138,23 @@ def unlock(repo: Path, passphrase: str) -> "tuple[InnerMetadata, SecureBytes, Di
     kmaster = derive_kmaster(passphrase, salt, t, m, paral)
     inner_bytes = aead_decrypt(bytes(kmaster), nonce, ct)
     inner = InnerMetadata.from_bytes(inner_bytes)
+
+    # Decrypt per-file metadata (name, relpath) for entries using the new format.
+    for f in inner.files:
+        if "name_enc" in f:
+            wrap = f["file_key_wrap"]
+            file_key = bytearray(
+                aead_decrypt(bytes(kmaster), base64.b64decode(wrap["nonce"]), base64.b64decode(wrap["ct"]))
+            )
+            try:
+                f["name"] = _decrypt_name(f["name_enc"], bytes(file_key))
+                if f.get("relpath_enc"):
+                    f["relpath"] = _decrypt_name(f["relpath_enc"], bytes(file_key))
+                else:
+                    f["relpath"] = None
+            finally:
+                wipe_key(file_key)
+
     return inner, kmaster, {"t": t, "m": m, "p": paral, "salt": salt}
 
 
@@ -114,14 +172,18 @@ def update_file_in_vault(repo: Path, fid: str, new_content: bytes, passphrase: s
         # Generate new per-file key
         file_key = SecureBytes(os.urandom(32))
         try:
-            # Encrypt new content with new file_key
+            # --- size obfuscation: append random padding before encrypting ---
+            pad_len = int.from_bytes(os.urandom(2), "big") % (PAD_MAX + 1)
+            padded = new_content + os.urandom(pad_len)
+
+            # Encrypt new (padded) content with new file_key
             file_nonce = os.urandom(12)
-            file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, new_content, None)
+            file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, padded, None)
 
             # Write new blob: nonce||ct
             blob_path = p["blobs"] / f"{fid}.bin"
-            with blob_path.open("wb") as f:
-                f.write(file_nonce + file_ct)
+            with blob_path.open("wb") as fh:
+                fh.write(file_nonce + file_ct)
 
             # Wrap new file_key with Kmaster
             wrap_nonce, wrap_ct = aead_encrypt(bytes(kmaster), bytes(file_key))
@@ -129,12 +191,22 @@ def update_file_in_vault(repo: Path, fid: str, new_content: bytes, passphrase: s
                 nonce_b64=base64.b64encode(wrap_nonce).decode(),
                 ct_b64=base64.b64encode(wrap_ct).decode(),
             )
+
+            # Re-encrypt the stored name with the new file_key.
+            # unlock() always populates "name" from name_enc; for legacy entries
+            # without name_enc the "name" key was already in the dict directly.
+            current_name = match["name"]
+            name_enc = _encrypt_name(current_name, bytes(file_key))
+            current_relpath = match.get("relpath")
+            relpath_enc = _encrypt_name(current_relpath, bytes(file_key)) if current_relpath else None
         finally:
             file_key.wipe()
 
         # Update the file entry
         match["size"] = len(new_content)
         match["file_key_wrap"] = keywrap.to_dict()
+        match["name_enc"] = name_enc
+        match["relpath_enc"] = relpath_enc
 
         # Re-encrypt inner and save vault
         inner_bytes = inner.to_bytes()
@@ -155,49 +227,8 @@ def cmd_add(args: argparse.Namespace) -> None:
     p = repo_paths(repo)
 
     try:
-        # Generate per-file key
-        file_key = SecureBytes(os.urandom(32))
-
-        # Read plaintext
-        plaintext = src.read_bytes()
-
-        try:
-            # Encrypt file content with file_key
-            file_nonce = os.urandom(12)
-            file_ct = AESGCM(bytes(file_key)).encrypt(file_nonce, plaintext, None)
-
-            # Write blob: nonce||ct
-            fid = str(uuid.uuid4())
-            blob_path = p["blobs"] / f"{fid}.bin"
-            with blob_path.open("wb") as f:
-                f.write(file_nonce + file_ct)
-
-            # Wrap file_key with Kmaster
-            wrap_nonce, wrap_ct = aead_encrypt(bytes(kmaster), bytes(file_key))
-            keywrap = KeyWrap(
-                nonce_b64=base64.b64encode(wrap_nonce).decode(),
-                ct_b64=base64.b64encode(wrap_ct).decode(),
-            )
-        finally:
-            file_key.wipe()
-
-        # Optional relative path metadata to preserve folder structure
         relpath_value = getattr(args, "relpath", None)
-        if relpath_value:
-            # normalize separators to POSIX-style for portability
-            relpath_value = str(Path(relpath_value).as_posix())
-
-        entry = FileEntry(
-            id=fid,
-            name=src.name,
-            relpath=relpath_value,
-            blob=f"blobs/{fid}.bin",
-            size=len(plaintext),
-            created_at=rel_time_iso(os.path.getctime(src)),
-            modified_at=rel_time_iso(os.path.getmtime(src)),
-            mimetype=None,
-            file_key_wrap=keywrap,
-        )
+        entry = prepare_file_add(repo, src, relpath_value, kmaster)
         inner.files.append(entry.to_dict())
 
         # Re-encrypt inner and save vault
@@ -207,7 +238,7 @@ def cmd_add(args: argparse.Namespace) -> None:
     finally:
         kmaster.wipe()
 
-    print(f"[+] Encrypted and added {src.name} as id={fid}")
+    print(f"[+] Encrypted and added {src.name} as id={entry.id}")
 
 
 def cmd_ls(args: argparse.Namespace) -> None:
@@ -249,7 +280,13 @@ def cmd_extract(args: argparse.Namespace) -> None:
                 print("[!] Corrupt blob")
                 sys.exit(1)
             file_nonce, file_ct = blob[:12], blob[12:]
-            plaintext = AESGCM(bytes(file_key)).decrypt(file_nonce, file_ct, None)
+            padded_plaintext = AESGCM(bytes(file_key)).decrypt(file_nonce, file_ct, None)
+            # Strip padding: truncate to the stored real (unpadded) size.
+            # 'size' is always present for valid entries; absence indicates
+            # corrupt or tampered metadata.
+            if "size" not in match:
+                raise ValueError("Metadata entry is missing the required 'size' field")
+            plaintext = padded_plaintext[:match["size"]]
         finally:
             file_key.wipe()
     finally:
