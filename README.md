@@ -16,7 +16,7 @@ A secure, user-friendly file encryption tool with both command-line and graphica
 
 ## 📋 Prerequisites
 
-- **Python**: 3.8 or higher
+- **Python**: 3.10 or higher
 - **pip**: Python package manager
 - **virtualenv** (recommended): For isolated Python environment
 
@@ -62,7 +62,7 @@ pip install -r requirements.txt
 - `pycryptodome>=3.18.0` - Additional crypto utilities
 - `argon2-cffi>=25.1.0` - Argon2 key derivation
 - `Pillow>=12.1.0` - Image processing
-- `pyinstaller` - Executable packaging
+- `pyinstaller` - Executable packaging (optional)
 
 ## 💻 Usage
 
@@ -256,7 +256,32 @@ pyinstaller vault.exe.spec
 
 The executable will be created in the `dist/` directory. You can distribute `vault.exe` as a standalone application.
 
-## 🤝 Contributing
+## � Testing
+
+The project includes comprehensive test coverage using pytest:
+
+### Run Tests Locally
+
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+Tests are organized by module:
+- `test_crypto.py` - Encryption and key derivation tests
+- `test_storage.py` - Vault file operations
+- `test_cli.py` - Command-line interface tests
+- `test_vault_ops.py` - Vault operations (add, extract, remove)
+- `test_edge_cases.py` - Edge case scenarios
+- `test_constants.py` - Constants validation
+
+### Continuous Integration
+
+Tests are automatically run on every push and pull request via GitHub Actions. The test matrix includes:
+- Python 3.11
+- Python 3.12
+
+## �🤝 Contributing
 
 Contributions are welcome! Please follow these guidelines:
 
@@ -272,7 +297,7 @@ Contributions are welcome! Please follow these guidelines:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-**Copyright (c) 2025 Aadithyan Raju**
+**Copyright (c) 2025-2026 Aadithyan Raju**
 
 ## 🙏 Acknowledgments
 
