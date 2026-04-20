@@ -1,5 +1,6 @@
 import argparse
 import base64
+import getpass
 import os
 import sys
 import uuid
@@ -70,8 +71,9 @@ def cmd_init(args: argparse.Namespace) -> None:
         print(f"[!] {p['vault']} exists. Use --force to overwrite.")
         sys.exit(1)
 
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
     salt = os.urandom(16)
-    kmaster = derive_kmaster(args.passphrase, salt, args.t, args.m, args.p)
+    kmaster = derive_kmaster(passphrase, salt, args.t, args.m, args.p)
     try:
         # Empty inner metadata
         inner = InnerMetadata(version=1, files=[])
@@ -151,7 +153,8 @@ def cmd_add(args: argparse.Namespace) -> None:
         print(f"[!] Not a file: {src}")
         sys.exit(1)
 
-    inner, kmaster, kdf = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
+    inner, kmaster, kdf = unlock(repo, passphrase)
     p = repo_paths(repo)
 
     try:
@@ -212,7 +215,8 @@ def cmd_add(args: argparse.Namespace) -> None:
 
 def cmd_ls(args: argparse.Namespace) -> None:
     repo = Path(args.repo)
-    inner, kmaster, _ = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
+    inner, kmaster, _ = unlock(repo, passphrase)
     try:
         if not inner.files:
             print("(empty)")
@@ -228,7 +232,8 @@ def cmd_extract(args: argparse.Namespace) -> None:
     fid = args.id
     out = Path(args.out)
 
-    inner, kmaster, _ = unlock(repo, args.passphrase)
+    passphrase = getattr(args, "passphrase", None) or getpass.getpass("Passphrase: ")
+    inner, kmaster, _ = unlock(repo, passphrase)
 
     try:
         match = next((f for f in inner.files if f["id"] == fid), None)
