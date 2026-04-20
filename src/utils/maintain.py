@@ -9,7 +9,7 @@ from crypto.hash import derive_kmaster
 from crypto.aead import aead_encrypt, aead_decrypt
 from crypto.secure_bytes import SecureBytes, wipe_key
 from storage.vault import save_vault
-from utils.core import unlock
+from utils.core import unlock, compute_vault_merkle_root
 from utils.dataModels import InnerMetadata
 from utils.helper import repo_paths
 
@@ -32,7 +32,8 @@ def cmd_rm(args: argparse.Namespace) -> None:
         # Remove entry
         inner.files = [f for f in inner.files if f["id"] != fid]
 
-        inner_bytes = InnerMetadata(version=1, files=inner.files).to_bytes()
+        inner.merkle_root = base64.b64encode(compute_vault_merkle_root(repo, inner.files)).decode()
+        inner_bytes = InnerMetadata(version=1, files=inner.files, merkle_root=inner.merkle_root).to_bytes()
         new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
         save_vault(repo_paths(repo)["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
     finally:
@@ -52,7 +53,8 @@ def cmd_rename(args: argparse.Namespace) -> None:
             sys.exit(1)
         match["name"] = new_name
 
-        inner_bytes = InnerMetadata(version=1, files=inner.files).to_bytes()
+        inner.merkle_root = base64.b64encode(compute_vault_merkle_root(repo, inner.files)).decode()
+        inner_bytes = InnerMetadata(version=1, files=inner.files, merkle_root=inner.merkle_root).to_bytes()
         new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
         save_vault(repo_paths(repo)["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
     finally:
@@ -93,7 +95,8 @@ def cmd_rotate_master(args: argparse.Namespace) -> None:
             f["file_key_wrap"] = {"nonce": base64.b64encode(n).decode(), "ct": base64.b64encode(c).decode()}
 
         # Re-encrypt inner under new master
-        inner_bytes = InnerMetadata(version=1, files=inner.files).to_bytes()
+        inner.merkle_root = base64.b64encode(compute_vault_merkle_root(repo, inner.files)).decode()
+        inner_bytes = InnerMetadata(version=1, files=inner.files, merkle_root=inner.merkle_root).to_bytes()
         nonce, ct = aead_encrypt(bytes(new_kmaster), inner_bytes)
 
         save_vault(repo_paths(repo)["vault"], new_t, new_m, new_p, new_salt, nonce, ct)

@@ -10,8 +10,8 @@ Provides:
 """
 
 import ctypes
+import hmac
 import platform
-
 
 def _get_libc():
     """Return the libc CDLL handle for mlock/munlock (Unix-like only)."""
@@ -165,3 +165,14 @@ class SecureBytes:
     def __repr__(self) -> str:
         # Never reveal key material in string representations.
         return f"<SecureBytes len={len(self)} locked={self._locked}>"
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SecureBytes):
+            if self._buf is None or other._buf is None:
+                return self._buf is other._buf
+            return hmac.compare_digest(bytes(self._buf), bytes(other._buf))
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        # Mutable, sensitive objects should not be hashable.
+        raise TypeError("SecureBytes objects are not hashable")

@@ -1,7 +1,7 @@
 import argparse
 
 from ui.gui import cmd_gui
-from utils.core import cmd_add, cmd_ls, cmd_extract, cmd_init
+from utils.core import cmd_add, cmd_ls, cmd_extract, cmd_init, cmd_verify
 from utils.dataModels import DEFAULT_T_COST, DEFAULT_M_COST_KiB, DEFAULT_PARALLELISM
 from utils.maintain import cmd_rename, cmd_rm, cmd_rotate_master
 
@@ -63,6 +63,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_gui = sub.add_parser("gui", help="Launch minimal GUI")
     p_gui.add_argument("repo", nargs="?", help="Path to repo directory (optional)")
     p_gui.set_defaults(func=cmd_gui)
+
+    p_ver = sub.add_parser("verify", help="Verify vault integrity via Merkle tree")
+    p_ver.add_argument("repo", help="Path to repo directory")
+    p_ver.add_argument("--passphrase", required=True)
+    p_ver.set_defaults(func=cmd_verify)
 
     return p
 

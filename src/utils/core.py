@@ -6,14 +6,51 @@ import uuid
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 from crypto.aead import aead_encrypt, aead_decrypt
 from crypto.hash import derive_kmaster
+from crypto.merkle import compute_merkle_root
 from crypto.secure_bytes import SecureBytes, wipe_key
 from storage.vault import save_vault, load_vault
 from utils.helper import repo_paths, rel_time_iso
 from utils.dataModels import InnerMetadata, KeyWrap, FileEntry
+
+
+def compute_vault_merkle_root(repo: Path, files: List[Dict]) -> bytes:
+    """Return the Merkle root computed over the raw blob bytes of *files*.
+
+    Leaves are ordered by their position in *files* (i.e. the canonical
+    order stored in ``InnerMetadata.files``).  Missing blobs cause a
+    ``FileNotFoundError``.
+    """
+    blobs = [((repo / f["blob"]).read_bytes()) for f in files]
+    return compute_merkle_root(blobs)
+
+
+def verify_vault_integrity(repo: Path, inner: InnerMetadata) -> None:
+    """Verify the vault's Merkle root against the stored value.
+
+    Raises:
+        ValueError: if no Merkle root is stored (vault predates this
+            feature) or if the computed root does not match the stored one.
+    """
+    if inner.merkle_root is None:
+        raise ValueError("Vault has no Merkle root; run any vault-modifying command (add/rm/rename/rotate-master) to upgrade.")
+    stored = base64.b64decode(inner.merkle_root)
+    computed = compute_vault_merkle_root(repo, inner.files)
+    if computed != stored:
+        raise ValueError("Vault integrity check FAILED: Merkle root mismatch – possible tampering or corruption detected.")
+
+
+def cmd_verify(args: argparse.Namespace) -> None:
+    repo = Path(args.repo)
+    inner, kmaster, _ = unlock(repo, args.passphrase)
+    try:
+        verify_vault_integrity(repo, inner)
+    finally:
+        kmaster.wipe()
+    print("[+] Vault integrity verified: Merkle tree root matches.")
 
 
 def prepare_file_add(repo: Path, src: Path, relpath: str | None, kmaster: "bytes | SecureBytes") -> FileEntry:
@@ -74,7 +111,8 @@ def cmd_init(args: argparse.Namespace) -> None:
     kmaster = derive_kmaster(args.passphrase, salt, args.t, args.m, args.p)
     try:
         # Empty inner metadata
-        inner = InnerMetadata(version=1, files=[])
+        merkle_root_b64 = base64.b64encode(compute_merkle_root([])).decode()
+        inner = InnerMetadata(version=1, files=[], merkle_root=merkle_root_b64)
         inner_bytes = inner.to_bytes()
 
         # Encrypt inner under Kmaster
@@ -136,7 +174,8 @@ def update_file_in_vault(repo: Path, fid: str, new_content: bytes, passphrase: s
         match["size"] = len(new_content)
         match["file_key_wrap"] = keywrap.to_dict()
 
-        # Re-encrypt inner and save vault
+        # Update Merkle root and re-encrypt inner and save vault
+        inner.merkle_root = base64.b64encode(compute_vault_merkle_root(repo, inner.files)).decode()
         inner_bytes = inner.to_bytes()
         new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
         save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
@@ -200,7 +239,8 @@ def cmd_add(args: argparse.Namespace) -> None:
         )
         inner.files.append(entry.to_dict())
 
-        # Re-encrypt inner and save vault
+        # Update Merkle root and re-encrypt inner and save vault
+        inner.merkle_root = base64.b64encode(compute_vault_merkle_root(repo, inner.files)).decode()
         inner_bytes = inner.to_bytes()
         new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
         save_vault(p["vault"], kdf["t"], kdf["m"], kdf["p"], kdf["salt"], new_nonce, new_ct)
