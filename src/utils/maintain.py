@@ -50,7 +50,19 @@ def cmd_rename(args: argparse.Namespace) -> None:
         if not match:
             print(f"[!] No such id: {fid}")
             sys.exit(1)
-        match["name"] = new_name
+
+        # Re-encrypt the new filename with the per-file key.
+        wrap = match["file_key_wrap"]
+        file_key = bytearray(
+            aead_decrypt(bytes(kmaster), base64.b64decode(wrap["nonce"]), base64.b64decode(wrap["ct"]))
+        )
+        try:
+            nonce, ct = aead_encrypt(bytes(file_key), new_name.encode("utf-8"))
+            match["name_enc"] = base64.b64encode(nonce + ct).decode()
+        finally:
+            wipe_key(file_key)
+
+        match["name"] = new_name  # update the in-memory convenience field
 
         inner_bytes = InnerMetadata(version=1, files=inner.files).to_bytes()
         new_nonce, new_ct = aead_encrypt(bytes(kmaster), inner_bytes)
